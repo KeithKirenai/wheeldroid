@@ -9,6 +9,7 @@ display_mode = "windowed"
 graphics_api = "vulkan"
 skip_unready_pipelines = true
 disable_copy_filter = true
+force_30fps = false
 show_fps = false
 texture_replacements = false
 texture_dumps = false

@@ -313,6 +313,7 @@ class MainActivity : AppCompatActivity() {
         binding.switchDisableCopyFilter.isChecked = prefs.getBoolean("disable_copy_filter", true)
         binding.switchDisableBloom.isChecked = prefs.getBoolean("disable_bloom", true)
         binding.switchSustainedPerf.isChecked = prefs.getBoolean("sustained_perf", true)
+        binding.switchForce30Fps.isChecked = prefs.getBoolean("force_30fps", false)
         binding.switchAudioMixer.isChecked = prefs.getBoolean("audio_mixer", true)
 
         // 3. Input controls
@@ -384,6 +385,7 @@ class MainActivity : AppCompatActivity() {
         val disableCopyFilter = binding.switchDisableCopyFilter.isChecked
         val disableBloom = binding.switchDisableBloom.isChecked
         val sustainedPerf = binding.switchSustainedPerf.isChecked
+        val force30Fps = binding.switchForce30Fps.isChecked
         val audioMixer = binding.switchAudioMixer.isChecked
 
         val touchControls = binding.switchTouchControls.isChecked
@@ -405,6 +407,7 @@ class MainActivity : AppCompatActivity() {
             .putBoolean("disable_copy_filter", disableCopyFilter)
             .putBoolean("disable_bloom", disableBloom)
             .putBoolean("sustained_perf", sustainedPerf)
+            .putBoolean("force_30fps", force30Fps)
             .putBoolean("audio_mixer", audioMixer)
             .putBoolean("touch_controls", touchControls)
             .putBoolean("tilt_controls", tiltControls)
@@ -436,6 +439,7 @@ class MainActivity : AppCompatActivity() {
             skipUnreadyPipelines = skipUnreadyPipelines,
             disableCopyFilter = disableCopyFilter,
             disableBloom = disableBloom,
+            force30Fps = force30Fps,
             audioMixer = audioMixer,
             masterVolume = masterVol / 100.0f,
             musicVolume = musicVol / 100.0f,
@@ -455,6 +459,7 @@ class MainActivity : AppCompatActivity() {
         skipUnreadyPipelines: Boolean,
         disableCopyFilter: Boolean,
         disableBloom: Boolean,
+        force30Fps: Boolean = false,
         audioMixer: Boolean,
         masterVolume: Float,
         musicVolume: Float,
@@ -496,6 +501,7 @@ class MainActivity : AppCompatActivity() {
                 |graphics_api = "$graphicsApi"
                 |skip_unready_pipelines = $skipUnreadyPipelines
                 |disable_copy_filter = $disableCopyFilter
+                |force_30fps = $force30Fps
                 |disabled_post_processing_paths = $postProcessingPaths
                 |show_fps = $showFps
                 |show_fps_passes = ${prefs.getBoolean("show_fps_passes", false)}

@@ -463,6 +463,57 @@
                     android:background="@color/md_theme_dark_outlineVariant"
                     android:layout_marginVertical="2dp" />
 
+                <!-- 30 FPS Mode Switch (Low-End Devices) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="10dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_speedometer"
+                        android:layout_marginEnd="10dp"
+                        android:contentDescription="30 FPS Mode Icon" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="30 FPS Mode (Low-End Devices)"
+                            android:textColor="@color/md_theme_dark_onSurface"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Uses game's split-screen physics; cuts GPU/battery load"
+                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchForce30Fps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:thumbTint="@color/switch_teal_thumb"
+                        app:trackTint="@color/switch_teal_track"
+                        android:checked="false" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/md_theme_dark_outlineVariant"
+                    android:layout_marginVertical="2dp" />
+
                 <!-- Async Audio Mixing Switch -->
                 <LinearLayout
                     android:layout_width="match_parent"

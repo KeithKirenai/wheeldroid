@@ -1168,6 +1168,7 @@ void InitializeRuntimeSettings() noexcept {
     MusicAttenuation::SetVoicesVolume(static_cast<float>(g_voicesVolumePercent) / 100.0f);
     MusicAttenuation::SetEnabled(g_attenuateMusicWhenMediaPlays);
     RuntimeGameGraphicsOptions::SetDisabledPostProcessingPaths(g_disabledPostProcessingPaths);
+    RuntimeGameGraphicsOptions::SetForce30Fps(RuntimeConfigFile::Force30Fps(false));
     const uint32_t targetFps = kFrameInterpolationTargetFps[static_cast<size_t>(g_frameInterpolationMode)];
     LimitResolutionForFrameRate();
     aurora_set_frame_interpolation_fps(targetFps);

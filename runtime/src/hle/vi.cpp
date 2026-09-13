@@ -8,6 +8,7 @@
 #include "fiber_manager.h"
 #include "platform/host_platform.h"
 #include "runtime_log.h"
+#include "game_graphics_options.h"
 
 #include <dolphin/vi.h>
 
@@ -351,6 +352,28 @@ void AdvanceRetrace(CpuContext* ctx, Clock::time_point retraceStamp, bool servic
             uint32_t sSystemPtr = Memory::Read32(kEggSSystemAddr);
             if (sSystemPtr != 0) {
                 InvokeIndirectCpu(postCb, ctx);
+            }
+        }
+
+        // Force 30 FPS [Nick Reynolds] - PAL (RMCP01)
+        // Gecko code:
+        //   00429454 00000002
+        //   002A40E9 00000002
+        // Forces the framerate divider byte to 2 (30 FPS) for low-end devices.
+        if (RuntimeGameGraphicsOptions::Force30Fps()) {
+            if (Memory::Contains(0x80429454, 1)) {
+                Memory::Write8(0x80429454, 2);
+            }
+            if (Memory::Contains(0x802A40E9, 1)) {
+                Memory::Write8(0x802A40E9, 2);
+            }
+            // Also ensure EGG::AsyncDisplay retrace divider byte (+8) is set to 2 if available
+            uint32_t sSystemPtr = Memory::Read32(kEggSSystemAddr);
+            if (sSystemPtr != 0 && Memory::Contains(sSystemPtr + 76, 4)) {
+                uint32_t asyncDisplay = Memory::Read32(sSystemPtr + 76);
+                if (asyncDisplay != 0 && Memory::Contains(asyncDisplay + 8, 1)) {
+                    Memory::Write8(asyncDisplay + 8, 2);
+                }
             }
         }
     }

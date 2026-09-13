@@ -41,6 +41,7 @@ struct RuntimeUserConfig {
     std::optional<std::string> graphicsApi;
     std::optional<std::string> displayMode;
     std::optional<uint32_t> frameInterpolationFps;
+    std::optional<bool> force30Fps;
     std::optional<bool> skipUnreadyPipelines;
     std::optional<bool> disableCopyFilter;
     std::optional<bool> textureReplacements;
@@ -466,6 +467,7 @@ inline RuntimeUserConfig ParseConfigDocument(const toml::value& document) {
             config.frameInterpolationFps = migrated;
         }
     }
+    config.force30Fps = FindConfigValue<bool>(document, "video", "force_30fps");
     config.skipUnreadyPipelines = FindConfigValue<bool>(document, "video", "skip_unready_pipelines");
     config.disableCopyFilter = FindConfigValue<bool>(document, "video", "disable_copy_filter");
     config.showFps = FindConfigValue<bool>(document, "video", "show_fps");
@@ -687,6 +689,11 @@ inline bool SetDisplayMode(std::string value) {
 inline bool SetSkipUnreadyPipelines(bool value) {
     Mutable().skipUnreadyPipelines = value;
     return WriteSetting("video", "skip_unready_pipelines", value ? "true" : "false");
+}
+
+inline bool SetForce30Fps(bool value) {
+    Mutable().force30Fps = value;
+    return WriteSetting("video", "force_30fps", value ? "true" : "false");
 }
 
 inline bool SetDisableCopyFilter(bool value) {
@@ -917,6 +924,11 @@ inline uint32_t FrameInterpolationFps(uint32_t fallback = 0) {
 // Whether to skip draws whose graphics pipeline has not finished compiling yet.
 inline bool SkipUnreadyPipelines(bool fallback = true) {
     return Get().skipUnreadyPipelines.value_or(fallback);
+}
+
+// Forces Mario Kart Wii's built-in 30 fps mode (3P/4P split-screen divider & physics) for low-end devices.
+inline bool Force30Fps(bool fallback = false) {
+    return Get().force30Fps.value_or(fallback);
 }
 
 inline bool DisableCopyFilter(bool fallback = true) {

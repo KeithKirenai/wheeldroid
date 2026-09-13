@@ -213,6 +213,8 @@ Not code, but the documentation this project depends on:
 - [Retro Rewind](https://wiki.tockdom.com/wiki/Retro_Rewind) by ZPL - the mod distribution this
   project can build as a static profile. No Retro Rewind content is redistributed here; users
   supply their own copy.
+- **Force 30 FPS Gecko code** created by Nick Reynolds - used in the runtime's low-end device
+  30 FPS mode to adjust race framerate dividers (`0x80429454` and `0x802A40E9`).
 
 ---
 

@@ -29,6 +29,12 @@ inline void ApplyRuntimeCallOptions(uint32_t target, CpuContext* ctx) {
     if (target == 0x8023BD38u) {
         // ScnRenderer::createPath receives the post-processing path mask in r4.
         ctx->gpr[4] = RuntimeGameGraphicsOptions::FilterScnRendererPathMask(ctx->gpr[4]);
+    } else if (target == 0x8051AF84u) {
+        // GameScene::SetFramerate (PAL): r4 == 1 selects 60 fps (1 field per retrace),
+        // r4 == 0 selects 30 fps (2 fields per retrace, matching 3P/4P split-screen physics).
+        if (RuntimeGameGraphicsOptions::Force30Fps()) {
+            ctx->gpr[4] = 0;
+        }
     }
 }
 
