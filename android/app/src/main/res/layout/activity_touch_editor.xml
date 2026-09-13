@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Touch Controls Layout Editor
+    The game's real buttons are placed inside editorOverlay (a FrameLayout that fills the screen).
+    The player drags them to reposition and uses the resize handle (corner grip) to resize.
+    The top toolbar has Save / Reset / Cancel actions.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E6060D1A">
+
+    <!-- ── hint label shown in the centre of the canvas ── -->
+    <TextView
+        android:id="@+id/editorHint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="Drag to move  •  Corner grip or pinch to resize"
+        android:textColor="#88FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="italic"
+        android:gravity="center"
+        android:paddingHorizontal="24dp" />
+
+    <!-- ── draggable control overlay (buttons are programmatically added here) ── -->
+    <FrameLayout
+        android:id="@+id/editorOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- ── top action bar ── -->
+    <LinearLayout
+        android:id="@+id/editorToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="10dp"
+        android:background="#D0080F1E"
+        android:elevation="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🎮  Edit Touch Layout"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editorBtnReset"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="8dp"
+            android:text="Reset"
+            android:textSize="13sp"
+            app:cornerRadius="18dp"
+            app:backgroundTint="#FF303030"
+            android:textColor="#FFDDDDDD" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editorBtnCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="8dp"
+            android:text="Cancel"
+            android:textSize="13sp"
+            app:cornerRadius="18dp"
+            app:backgroundTint="#4D5A6A"
+            android:textColor="#FFFFFFFF" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editorBtnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Save"
+            android:textSize="13sp"
+            app:cornerRadius="18dp"
+            app:backgroundTint="@color/md_theme_dark_primary"
+            android:textColor="#FFFFFFFF" />
+
+    </LinearLayout>
+
+</FrameLayout>

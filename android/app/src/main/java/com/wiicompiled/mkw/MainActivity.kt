@@ -46,6 +46,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, RemapperActivity::class.java))
         }
 
+        binding.btnEditTouchLayout.setOnClickListener {
+            startActivity(Intent(this, TouchControlsEditorActivity::class.java))
+        }
+
         binding.exportLogsBtn.setOnClickListener {
             exportLogs()
         }
@@ -292,19 +296,42 @@ class MainActivity : AppCompatActivity() {
     private fun setupConfigOptions() {
         val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
 
-        // 1. Resolution
-        val resOptions = arrayOf(
-            "0.5x (Downscale 240p/264p) [Experimental]",
-            "0.75x (Downscale 360p/396p) [Experimental]",
-            "1.0x (Native 480p/528p)",
-            "1.5x (HD 720p/792p)",
-            "2.0x (FHD 960p/1056p)",
-            "3.0x (QHD 1440p/1584p)"
+        // 1. Resolution & Upscaler
+        val resMultiplierValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f)
+        val resLabels = arrayOf(
+            "0.5x (50%) [240p]",
+            "0.75x (75%) [360p]",
+            "1.0x (100%) [480p Native]",
+            "1.5x (150%) [720p HD]",
+            "2.0x (200%) [960p FHD]",
+            "3.0x (300%) [1440p QHD]"
         )
-        val resAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, resOptions)
-        binding.spinnerResolution.adapter = resAdapter
-        val savedResIdx = prefs.getInt("resolution_idx", 2)
-        binding.spinnerResolution.setSelection(savedResIdx.coerceIn(0, resOptions.size - 1))
+        val savedResIdx = prefs.getInt("resolution_idx", 2).coerceIn(0, resMultiplierValues.size - 1)
+        binding.sliderResolution.value = savedResIdx.toFloat()
+        binding.textResolution.text = resLabels[savedResIdx]
+        binding.sliderResolution.addOnChangeListener { _, value, _ ->
+            val idx = value.toInt().coerceIn(0, resLabels.size - 1)
+            binding.textResolution.text = resLabels[idx]
+        }
+
+        val filterOptions = arrayOf(
+            "Bilinear (Standard)",
+            "Nearest Neighbor (Integer / Sharp)",
+            "Bicubic (Catmull-Rom)",
+            "AMD FSR 1.0 (Eden / FidelityFX)"
+        )
+        val filterAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, filterOptions)
+        binding.spinnerScalingFilter.adapter = filterAdapter
+        val savedFilterIdx = prefs.getInt("scaling_filter_idx", 0)
+        binding.spinnerScalingFilter.setSelection(savedFilterIdx.coerceIn(0, filterOptions.size - 1))
+
+        val fsrSharpness = prefs.getInt("fsr_sharpness", 80)
+        binding.sliderFsrSharpness.value = fsrSharpness.toFloat()
+        binding.textFsrSharpness.text = "$fsrSharpness%"
+        binding.layoutFsrSharpness.visibility = if (savedFilterIdx == 3) View.VISIBLE else View.GONE
+        binding.sliderFsrSharpness.addOnChangeListener { _, value, _ ->
+            binding.textFsrSharpness.text = "${value.toInt()}%"
+        }
 
         // 2. Graphics toggles
         binding.switchWidescreen.isChecked = prefs.getBoolean("widescreen", true)
@@ -358,11 +385,14 @@ class MainActivity : AppCompatActivity() {
 
         val autoSaveSelected = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (parent == binding.spinnerScalingFilter) {
+                    binding.layoutFsrSharpness.visibility = if (position == 3) View.VISIBLE else View.GONE
+                }
                 saveConfigOptions()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
-        binding.spinnerResolution.onItemSelectedListener = autoSaveSelected
+        binding.spinnerScalingFilter.onItemSelectedListener = autoSaveSelected
 
         val autoSaveSlider = object : com.google.android.material.slider.Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {}
@@ -370,15 +400,19 @@ class MainActivity : AppCompatActivity() {
                 saveConfigOptions()
             }
         }
+        binding.sliderResolution.addOnSliderTouchListener(autoSaveSlider)
         binding.sliderMasterVolume.addOnSliderTouchListener(autoSaveSlider)
         binding.sliderMusicVolume.addOnSliderTouchListener(autoSaveSlider)
         binding.sliderSfxVolume.addOnSliderTouchListener(autoSaveSlider)
+        binding.sliderFsrSharpness.addOnSliderTouchListener(autoSaveSlider)
     }
 
     private fun saveConfigOptions() {
         val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
 
-        val resIdx = binding.spinnerResolution.selectedItemPosition
+        val resIdx = binding.sliderResolution.value.toInt().coerceIn(0, 5)
+        val scalingFilterIdx = binding.spinnerScalingFilter.selectedItemPosition
+        val fsrSharpness = binding.sliderFsrSharpness.value.toInt()
         val widescreen = binding.switchWidescreen.isChecked
         val extendToNotch = binding.switchExtendToNotch.isChecked
         val skipUnreadyPipelines = binding.switchSkipUnreadyPipelines.isChecked
@@ -401,6 +435,8 @@ class MainActivity : AppCompatActivity() {
         prefs.edit()
             .putString("graphics_api", "vulkan")
             .putInt("resolution_idx", resIdx)
+            .putInt("scaling_filter_idx", scalingFilterIdx)
+            .putInt("fsr_sharpness", fsrSharpness)
             .putBoolean("widescreen", widescreen)
             .putBoolean("extend_to_notch", extendToNotch)
             .putBoolean("skip_unready_pipelines", skipUnreadyPipelines)
@@ -428,6 +464,13 @@ class MainActivity : AppCompatActivity() {
             else -> "1.0"
         }
 
+        val scalingFilterStr = when (scalingFilterIdx) {
+            1 -> "nearest"
+            2 -> "bicubic"
+            3 -> "fsr"
+            else -> "bilinear"
+        }
+
         val frameInterpolationFps = 0
         val rumble = prefs.getBoolean("rumble", true)
         val showFps = prefs.getBoolean("show_fps", false)
@@ -435,6 +478,8 @@ class MainActivity : AppCompatActivity() {
         updateConfigFile(
             graphicsApi = "vulkan",
             resolutionMultiplier = multiplier,
+            scalingFilter = scalingFilterStr,
+            fsrSharpness = fsrSharpness / 100.0f,
             widescreen = widescreen,
             skipUnreadyPipelines = skipUnreadyPipelines,
             disableCopyFilter = disableCopyFilter,
@@ -455,6 +500,8 @@ class MainActivity : AppCompatActivity() {
     private fun updateConfigFile(
         graphicsApi: String = "vulkan",
         resolutionMultiplier: String,
+        scalingFilter: String = "bilinear",
+        fsrSharpness: Float = 0.8f,
         widescreen: Boolean,
         skipUnreadyPipelines: Boolean,
         disableCopyFilter: Boolean,
@@ -488,6 +535,7 @@ class MainActivity : AppCompatActivity() {
             val audioVolStr = String.format(java.util.Locale.US, "%.2f", masterVolume)
             val musicVolStr = String.format(java.util.Locale.US, "%.2f", musicVolume)
             val sfxVolStr = String.format(java.util.Locale.US, "%.2f", sfxVolume)
+            val fsrSharpnessStr = String.format(java.util.Locale.US, "%.2f", fsrSharpness)
             val postProcessingPaths = if (disableBloom) 16 else 0
 
             val content = """
@@ -496,6 +544,8 @@ class MainActivity : AppCompatActivity() {
                 $pathsSection|[video]
                 |widescreen = $widescreen
                 |resolution_multiplier = $resolutionMultiplier
+                |scaling_filter = "$scalingFilter"
+                |fsr_sharpness = $fsrSharpnessStr
                 |frame_interpolation_fps = $frameInterpolationFps
                 |display_mode = "windowed"
                 |graphics_api = "$graphicsApi"

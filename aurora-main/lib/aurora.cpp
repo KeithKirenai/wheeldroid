@@ -1205,7 +1205,7 @@ void encode_presentation_snapshot(const wgpu::CommandEncoder& encoder,
         .colorAttachments = attachments.data(),
     };
     const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
-    pass.SetPipeline(webgpu::g_CopyPipeline);
+    pass.SetPipeline(webgpu::active_copy_pipeline());
     pass.SetBindGroup(0, presentBindGroup, 0, nullptr);
     pass.SetViewport(viewport.left, viewport.top, viewport.width, viewport.height,
                      viewport.znear, viewport.zfar);

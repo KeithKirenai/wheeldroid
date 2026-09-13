@@ -55,12 +55,17 @@ extern TextureWithSampler g_frameBuffer;
 extern TextureWithSampler g_frameBufferResolved;
 extern TextureWithSampler g_depthBuffer;
 extern wgpu::RenderPipeline g_CopyPipeline;
+extern wgpu::RenderPipeline g_CopyPipelineNearest;
+extern wgpu::RenderPipeline g_CopyPipelineBicubic;
+extern wgpu::RenderPipeline g_CopyPipelineFsr;
 extern wgpu::BindGroup g_CopyBindGroup;
 extern wgpu::Instance g_instance;
 extern bool g_bcTexturesSupported;
 // Adapter advertises WGPUFeatureName_TimestampQuery and the device was created with it required.
 // When true the gfx layer instruments per-render-pass GPU time for diagnostics.
 extern bool g_timestampQuerySupported;
+
+wgpu::RenderPipeline active_copy_pipeline() noexcept;
 
 bool initialize(AuroraBackend backend);
 void shutdown();

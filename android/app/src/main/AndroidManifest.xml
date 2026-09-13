@@ -55,6 +55,15 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
         </activity>
 
+        <activity
+            android:name=".TouchControlsEditorActivity"
+            android:exported="false"
+            android:label="Edit Touch Layout"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.WiiCompiled.Game"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+        </activity>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

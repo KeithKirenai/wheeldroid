@@ -215,6 +215,10 @@ Not code, but the documentation this project depends on:
   supply their own copy.
 - **Force 30 FPS Gecko code** created by Nick Reynolds - used in the runtime's low-end device
   30 FPS mode to adjust race framerate dividers (`0x80429454` and `0x802A40E9`).
+- **Eden Emulator Project & Yuzu** (<https://git.eden-emu.dev/eden-emu/eden>) - window presentation
+  upscaler shaders (Bicubic Catmull-Rom filtering and AMD FidelityFX Super Resolution 1.0 EASU/RCAS
+  pipeline) adapted for Aurora WebGPU.
+- **AMD FidelityFX Super Resolution (FSR 1.0)** - MIT License, Copyright (c) 2021 Advanced Micro Devices, Inc.
 
 ---
 

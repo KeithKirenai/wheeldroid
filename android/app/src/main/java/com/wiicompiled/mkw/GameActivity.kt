@@ -13,8 +13,12 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import org.libsdl.app.SDL
 import org.libsdl.app.SDLControllerManager
@@ -39,13 +43,26 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
     private lateinit var menuNotch: Button
     private lateinit var menuShowFps: Button
     private lateinit var menuExit: Button
-    private lateinit var touchOverlayContainer: View
+    private lateinit var menuEditLayout: Button
+    private lateinit var menuResetLayout: Button
+    private lateinit var touchOverlayContainer: FrameLayout
+    private lateinit var actionBtnContainer: View
     private var touchControlsEnabled = true
     private var tiltControlsEnabled = true
     private var extendToNotchEnabled = true
     private var showFpsEnabled = false
     private var menuOpen = false
     private var gamePaused = false
+
+    /** Launches TouchControlsEditorActivity and re-applies layout when it returns. */
+    private val editorLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            // User saved a new layout — apply it immediately to the live overlay
+            touchOverlayContainer.post { applyCustomLayout() }
+        }
+    }
 
     companion object {
         const val BTN_A = 0
@@ -153,8 +170,9 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         btnItem = findViewById(R.id.btnItem)
         btnPause = findViewById(R.id.btnPause)
         steeringArea = findViewById(R.id.steeringArea)
+        actionBtnContainer = findViewById(R.id.actionBtnContainer)
 
-        touchOverlayContainer = findViewById<View>(R.id.touchOverlayContainer)
+        touchOverlayContainer = findViewById(R.id.touchOverlayContainer)
 
         // Universal hardware scaling for mobile GPUs:
         // Configures the SurfaceView buffer resolution so lower-end GPUs don't choke on 1080p/1440p panels,
@@ -184,48 +202,14 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         val screenH = metrics.heightPixels
         val aspect = if (screenH > 0) screenW.toFloat() / screenH.toFloat() else (16f / 9f)
 
-        when (resIdx) {
-            0 -> { // Downscale 0.5x (240p/264p)
-                val targetH = 264
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (Downscale 264p, 0.5x)")
-            }
-            1 -> { // Downscale 0.75x (360p/396p)
-                val targetH = 396
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (Downscale 396p, 0.75x)")
-            }
-            2 -> { // Native (480p/528p)
-                val targetH = 528
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (Native 528p, 1.0x)")
-            }
-            3 -> { // HD (720p/792p)
-                val targetH = 792
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (HD 792p, 1.5x)")
-            }
-            4 -> { // FHD (960p/1056p)
-                val targetH = 1056
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (FHD 1056p, 2.0x)")
-            }
-            5 -> { // QHD (1440p/1584p)
-                val targetH = 1584
-                val targetW = (targetH * aspect).toInt()
-                surfaceView.holder.setFixedSize(targetW, targetH)
-                android.util.Log.i("WiiCompiled", "Hardware scaler configured: ${targetW}x${targetH} (QHD 1584p, 3.0x)")
-            }
-            else -> { // Full panel resolution
-                surfaceView.holder.setSizeFromLayout()
-                android.util.Log.i("WiiCompiled", "Full panel resolution configured: ${screenW}x${screenH}")
-            }
-        }
+        // For shader upscaling (FSR 1.0, Bicubic, Nearest Neighbor) and native rendering,
+        // the SurfaceView buffer must match the physical display resolution (setSizeFromLayout).
+        // Aurora renders internally at the chosen resolution multiplier (0.5x, 0.75x, 1.0x, etc.)
+        // and then its presentation shader upscales directly to the full-resolution swapchain.
+        // If setFixedSize was used, Android's SurfaceFlinger hardware composer would bilinearly stretch
+        // the low-res surface across the screen, bypassing and blurring the shader upscaler!
+        surfaceView.holder.setSizeFromLayout()
+        android.util.Log.i("WiiCompiled", "SurfaceView configured for full panel resolution: ${screenW}x${screenH} (resIdx: $resIdx, mult: $activeResMultiplier)")
 
         surfaceView.holder.addCallback(this)
         surfaceView.setOnTouchListener(null)
@@ -237,6 +221,20 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         setupButtonTouch(btnPause, BTN_START)
         setupSteeringTouch(steeringArea)
 
+        snapshotDefaultControlLayout()
+
+        // Apply saved custom touch control positions after the first layout pass
+        if (TouchControlsLayout.hasCustomLayout(this)) {
+            touchOverlayContainer.viewTreeObserver.addOnGlobalLayoutListener(
+                object : ViewTreeObserver.OnGlobalLayoutListener {
+                    override fun onGlobalLayout() {
+                        touchOverlayContainer.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        applyCustomLayout()
+                    }
+                }
+            )
+        }
+
         // Wire up the Dolphin-style in-game settings menu
         ingameMenu = findViewById(R.id.ingameMenu)
         menuPause = findViewById(R.id.menuPause)
@@ -245,12 +243,16 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         menuNotch = findViewById(R.id.menuNotch)
         menuShowFps = findViewById(R.id.menuShowFps)
         menuExit = findViewById(R.id.menuExit)
+        menuEditLayout = findViewById(R.id.menuEditLayout)
+        menuResetLayout = findViewById(R.id.menuResetLayout)
         menuPause.setOnClickListener { togglePause() }
         menuTouchControls.setOnClickListener { toggleTouchControls() }
         menuTiltControls.setOnClickListener { toggleTiltControls() }
         menuNotch.setOnClickListener { toggleNotchExtension() }
         menuShowFps.setOnClickListener { toggleFpsOverlay() }
         menuExit.setOnClickListener { exitToLauncher() }
+        menuEditLayout.setOnClickListener { openLayoutEditor() }
+        menuResetLayout.setOnClickListener { confirmResetLayout() }
         menuTouchControls.text = if (touchControlsEnabled) "Touch Controls: On" else "Touch Controls: Off"
         menuTiltControls.text = if (tiltControlsEnabled) "Tilt Steering: On" else "Tilt Steering: Off"
         menuNotch.text = if (extendToNotchEnabled) "Notch Area: Extend" else "Notch Area: Inset"
@@ -365,6 +367,62 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         }
 
         nativeInit(filesDir.absolutePath, activeResMultiplier)
+    }
+
+    private val defaultControlParams = mutableMapOf<View, FrameLayout.LayoutParams>()
+
+    private fun snapshotDefaultControlLayout() {
+        if (defaultControlParams.isNotEmpty()) return
+        listOf(btnItem, btnPause, steeringArea, actionBtnContainer).forEach { view ->
+            val lp = view.layoutParams as? FrameLayout.LayoutParams ?: return@forEach
+            defaultControlParams[view] = FrameLayout.LayoutParams(lp)
+        }
+    }
+
+    private fun applyCustomLayout() {
+        val cW = touchOverlayContainer.width
+        val cH = touchOverlayContainer.height
+        if (cW <= 0 || cH <= 0) return
+        snapshotDefaultControlLayout()
+        val views = mapOf(
+            TouchControlsLayout.CTRL_ITEM to btnItem,
+            TouchControlsLayout.CTRL_PAUSE to btnPause,
+            TouchControlsLayout.CTRL_STEER to steeringArea,
+            TouchControlsLayout.CTRL_ACTIONS to actionBtnContainer
+        )
+        for ((id, view) in views) {
+            TouchControlsLayout.applyToView(view, TouchControlsLayout.load(this, id), cW, cH)
+        }
+    }
+
+    private fun restoreDefaultControlLayout() {
+        snapshotDefaultControlLayout()
+        defaultControlParams.forEach { (view, lp) ->
+            view.layoutParams = FrameLayout.LayoutParams(lp)
+            view.translationX = 0f
+            view.translationY = 0f
+            view.requestLayout()
+        }
+    }
+
+    private fun openLayoutEditor() {
+        if (menuOpen) {
+            menuOpen = false
+            ingameMenu.visibility = View.GONE
+        }
+        editorLauncher.launch(Intent(this, TouchControlsEditorActivity::class.java))
+    }
+
+    private fun confirmResetLayout() {
+        AlertDialog.Builder(this)
+            .setTitle("Reset Layout")
+            .setMessage("Restore on-screen controls to their default positions and sizes?")
+            .setPositiveButton("Reset") { _, _ ->
+                TouchControlsLayout.resetAll(this)
+                restoreDefaultControlLayout()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun setupButtonTouch(btn: Button, buttonId: Int) {

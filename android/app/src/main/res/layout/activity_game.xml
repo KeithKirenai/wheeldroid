@@ -69,6 +69,7 @@
 
         <!-- Bottom Right Controls: A (Gas) and B (Drift) -->
         <RelativeLayout
+            android:id="@+id/actionBtnContainer"
             android:layout_width="200dp"
             android:layout_height="180dp"
             android:layout_gravity="bottom|end"
@@ -202,6 +203,37 @@
                     android:layout_height="46dp"
                     android:layout_marginBottom="8dp"
                     android:text="FPS Overlay: Off"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="23dp"
+                    app:backgroundTint="@color/md_theme_dark_surfaceContainerHigh"
+                    android:textColor="@color/md_theme_dark_onSurface" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/md_theme_dark_outlineVariant"
+                    android:layout_marginVertical="8dp" />
+
+                <!-- Touch Controls Layout Editor -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/menuEditLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="✏️  Edit Touch Layout"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="23dp"
+                    app:backgroundTint="@color/md_theme_dark_surfaceContainerHigh"
+                    android:textColor="@color/md_theme_dark_onSurface" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/menuResetLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="↺  Reset Layout"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     app:cornerRadius="23dp"

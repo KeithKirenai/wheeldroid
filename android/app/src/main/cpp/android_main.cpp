@@ -264,6 +264,20 @@ Java_com_wiicompiled_mkw_GameActivity_nativeInit(JNIEnv* env, jobject thiz, jstr
     aurora_set_frame_interpolation_fps(frameInterpolationFps);
     LOGI("Runtime config active frameInterpolationFps: %u", frameInterpolationFps);
 
+    const std::string scalingFilter = RuntimeConfigFile::ScalingFilter("bilinear");
+    if (scalingFilter == "nearest") {
+        aurora_set_scaling_filter(AURORA_SCALING_FILTER_NEAREST);
+    } else if (scalingFilter == "bicubic") {
+        aurora_set_scaling_filter(AURORA_SCALING_FILTER_BICUBIC);
+    } else if (scalingFilter == "fsr") {
+        aurora_set_scaling_filter(AURORA_SCALING_FILTER_FSR);
+    } else {
+        aurora_set_scaling_filter(AURORA_SCALING_FILTER_BILINEAR);
+    }
+    const float fsrSharpness = RuntimeConfigFile::FsrSharpness(0.8f);
+    aurora_set_fsr_sharpness(fsrSharpness);
+    LOGI("Runtime config active scalingFilter: %s, fsrSharpness: %.2f", scalingFilter.c_str(), fsrSharpness);
+
     aurora_set_disable_copy_filter(true);
     env->ReleaseStringUTFChars(internalPath, pathStr);
 }

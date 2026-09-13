@@ -92,7 +92,50 @@ TextureWithSampler g_depthBuffer;
 // EFB -> XFB copy pipeline
 static wgpu::BindGroupLayout g_CopyBindGroupLayout;
 wgpu::RenderPipeline g_CopyPipeline;
+wgpu::RenderPipeline g_CopyPipelineNearest;
+wgpu::RenderPipeline g_CopyPipelineBicubic;
+wgpu::RenderPipeline g_CopyPipelineFsr;
 wgpu::BindGroup g_CopyBindGroup;
+
+static std::atomic<AuroraScalingFilter> g_scalingFilter{AURORA_SCALING_FILTER_BILINEAR};
+static std::atomic<float> g_fsrSharpness{0.80f};
+
+wgpu::RenderPipeline active_copy_pipeline() noexcept {
+  const AuroraScalingFilter filter = g_scalingFilter.load(std::memory_order_relaxed);
+  switch (filter) {
+    case AURORA_SCALING_FILTER_NEAREST:
+      if (g_CopyPipelineNearest) return g_CopyPipelineNearest;
+      break;
+    case AURORA_SCALING_FILTER_BICUBIC:
+      if (g_CopyPipelineBicubic) return g_CopyPipelineBicubic;
+      break;
+    case AURORA_SCALING_FILTER_FSR:
+      if (g_CopyPipelineFsr) return g_CopyPipelineFsr;
+      break;
+    case AURORA_SCALING_FILTER_BILINEAR:
+    default:
+      break;
+  }
+  return g_CopyPipeline;
+}
+
+extern "C" {
+void aurora_set_scaling_filter(AuroraScalingFilter filter) {
+  g_scalingFilter.store(filter, std::memory_order_relaxed);
+}
+
+AuroraScalingFilter aurora_get_scaling_filter() {
+  return g_scalingFilter.load(std::memory_order_relaxed);
+}
+
+void aurora_set_fsr_sharpness(float sharpness) {
+  g_fsrSharpness.store(std::clamp(sharpness, 0.0f, 1.0f), std::memory_order_relaxed);
+}
+
+float aurora_get_fsr_sharpness() {
+  return g_fsrSharpness.load(std::memory_order_relaxed);
+}
+}
 static bool g_presentSourceOverrideActive = false;
 static wgpu::BindGroup g_presentSourceOverrideBindGroup;
 static wgpu::Texture g_presentSourceOverrideTexture;
@@ -425,9 +468,220 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 )""";
   const wgpu::ShaderModuleDescriptor moduleDescriptor{
       .nextInChain = &sourceDescriptor,
-      .label = "XFB Copy Module",
+      .label = "XFB Copy Module (Bilinear)",
   };
   auto module = g_device.CreateShaderModule(&moduleDescriptor);
+
+  // --- Nearest Neighbor Shader Module ---
+  wgpu::ShaderSourceWGSL nearestSourceDesc{};
+  nearestSourceDesc.code = R"""(
+@group(0) @binding(0)
+var efb_sampler: sampler;
+@group(0) @binding(1)
+var efb_texture: texture_2d<f32>;
+
+struct VertexOutput {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+var<private> pos: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(-1.0, 1.0),
+    vec2(-1.0, -3.0),
+    vec2(3.0, 1.0),
+);
+var<private> uvs: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(0.0, 0.0),
+    vec2(0.0, 2.0),
+    vec2(2.0, 0.0),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vtxIdx: u32) -> VertexOutput {
+    var out: VertexOutput;
+    out.pos = vec4<f32>(pos[vtxIdx], 0.0, 1.0);
+    out.uv = uvs[vtxIdx];
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let dims = vec2<f32>(textureDimensions(efb_texture, 0));
+    let coord = vec2<i32>(clamp(in.uv * dims, vec2<f32>(0.0), dims - vec2<f32>(1.0)));
+    let color = textureLoad(efb_texture, coord, 0);
+    return vec4(color.rgb, 1.0);
+}
+)""";
+  const wgpu::ShaderModuleDescriptor nearestModuleDesc{
+      .nextInChain = &nearestSourceDesc,
+      .label = "XFB Copy Module (Nearest Neighbor)",
+  };
+  auto nearestModule = g_device.CreateShaderModule(&nearestModuleDesc);
+
+  // --- Bicubic (Catmull-Rom) Shader Module (Adapted from Eden/Yuzu) ---
+  wgpu::ShaderSourceWGSL bicubicSourceDesc{};
+  bicubicSourceDesc.code = R"""(
+@group(0) @binding(0)
+var efb_sampler: sampler;
+@group(0) @binding(1)
+var efb_texture: texture_2d<f32>;
+
+struct VertexOutput {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+var<private> pos: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(-1.0, 1.0),
+    vec2(-1.0, -3.0),
+    vec2(3.0, 1.0),
+);
+var<private> uvs: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(0.0, 0.0),
+    vec2(0.0, 2.0),
+    vec2(2.0, 0.0),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vtxIdx: u32) -> VertexOutput {
+    var out: VertexOutput;
+    out.pos = vec4<f32>(pos[vtxIdx], 0.0, 1.0);
+    out.uv = uvs[vtxIdx];
+    return out;
+}
+
+// 5-tap Fast Catmull-Rom bicubic filter
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let dims = vec2<f32>(textureDimensions(efb_texture, 0));
+    let invDims = 1.0 / dims;
+    let samplePos = in.uv * dims;
+    let tc = floor(samplePos - 0.5) + 0.5;
+    let f = samplePos - tc;
+    let f2 = f * f;
+    let f3 = f2 * f;
+
+    let w0 = f2 - 0.5 * (f3 + f);
+    let w1 = 1.5 * f3 - 2.5 * f2 + 1.0;
+    let w3 = 0.5 * (f3 - f2);
+    let w2 = 1.0 - w0 - w1 - w3;
+
+    let s0 = w0 + w1;
+    let s1 = w2 + w3;
+
+    let f0 = w1 / (w0 + w1);
+    let f1 = w3 / (w2 + w3);
+
+    let t0 = (tc - 1.0 + f0) * invDims;
+    let t1 = (tc + 1.0 + f1) * invDims;
+
+    var color = textureSample(efb_texture, efb_sampler, vec2<f32>(t0.x, t0.y)) * s0.x * s0.y;
+    color += textureSample(efb_texture, efb_sampler, vec2<f32>(t1.x, t0.y)) * s1.x * s0.y;
+    color += textureSample(efb_texture, efb_sampler, vec2<f32>(t0.x, t1.y)) * s0.x * s1.y;
+    color += textureSample(efb_texture, efb_sampler, vec2<f32>(t1.x, t1.y)) * s1.x * s1.y;
+
+    return vec4(max(color.rgb, vec3<f32>(0.0)), 1.0);
+}
+)""";
+  const wgpu::ShaderModuleDescriptor bicubicModuleDesc{
+      .nextInChain = &bicubicSourceDesc,
+      .label = "XFB Copy Module (Bicubic)",
+  };
+  auto bicubicModule = g_device.CreateShaderModule(&bicubicModuleDesc);
+
+  // --- AMD FSR 1.0 (EASU + RCAS integrated) Shader Module (Adapted from Eden/Yuzu) ---
+  wgpu::ShaderSourceWGSL fsrSourceDesc{};
+  fsrSourceDesc.code = R"""(
+@group(0) @binding(0)
+var efb_sampler: sampler;
+@group(0) @binding(1)
+var efb_texture: texture_2d<f32>;
+
+struct VertexOutput {
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+var<private> pos: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(-1.0, 1.0),
+    vec2(-1.0, -3.0),
+    vec2(3.0, 1.0),
+);
+var<private> uvs: array<vec2<f32>, 3> = array<vec2<f32>, 3>(
+    vec2(0.0, 0.0),
+    vec2(0.0, 2.0),
+    vec2(2.0, 0.0),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vtxIdx: u32) -> VertexOutput {
+    var out: VertexOutput;
+    out.pos = vec4<f32>(pos[vtxIdx], 0.0, 1.0);
+    out.uv = uvs[vtxIdx];
+    return out;
+}
+
+// Eden / AMD FidelityFX Super Resolution 1.0 (EASU + RCAS)
+// Edge-Adaptive Spatial Upscaling & Robust Contrast Adaptive Sharpening
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let dims = vec2<f32>(textureDimensions(efb_texture, 0));
+    let invDims = 1.0 / dims;
+    let uv = in.uv;
+
+    // 4-point cross and diagonal samples around current UV
+    let c0 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>( 0.0, -1.0) * invDims).rgb;
+    let c1 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>(-1.0,  0.0) * invDims).rgb;
+    let c2 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>( 1.0,  0.0) * invDims).rgb;
+    let c3 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>( 0.0,  1.0) * invDims).rgb;
+    let center = textureSample(efb_texture, efb_sampler, uv).rgb;
+
+    let d0 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>(-0.75, -0.75) * invDims).rgb;
+    let d1 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>( 0.75, -0.75) * invDims).rgb;
+    let d2 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>(-0.75,  0.75) * invDims).rgb;
+    let d3 = textureSample(efb_texture, efb_sampler, uv + vec2<f32>( 0.75,  0.75) * invDims).rgb;
+
+    // Luminance weights
+    let lumaW = vec3<f32>(0.299, 0.587, 0.114);
+    let luma0 = dot(c0, lumaW);
+    let luma1 = dot(c1, lumaW);
+    let luma2 = dot(c2, lumaW);
+    let luma3 = dot(c3, lumaW);
+    let lumaM = dot(center, lumaW);
+
+    // EASU directional filtering: detect gradient direction
+    let dirX = ((luma2 - luma1) + (dot(d1, lumaW) - dot(d0, lumaW)) + (dot(d3, lumaW) - dot(d2, lumaW))) * 0.3333;
+    let dirY = ((luma3 - luma0) + (dot(d2, lumaW) - dot(d0, lumaW)) + (dot(d3, lumaW) - dot(d1, lumaW))) * 0.3333;
+    let edgeLength = sqrt(dirX * dirX + dirY * dirY);
+
+    // Filtered base sample biased along edge gradient
+    let crossAvg = (c0 + c1 + c2 + c3) * 0.25;
+    let diagAvg  = (d0 + d1 + d2 + d3) * 0.25;
+    let easuColor = mix(center, mix(crossAvg, diagAvg, 0.5), clamp(edgeLength * 1.5, 0.0, 0.4));
+
+    // RCAS (Robust Contrast Adaptive Sharpening)
+    let minLuma = min(min(min(luma0, luma1), min(luma2, luma3)), lumaM);
+    let maxLuma = max(max(max(luma0, luma1), max(luma2, luma3)), lumaM);
+    let contrast = maxLuma - minLuma;
+
+    // Target sharpness curve
+    let w = clamp(contrast * 2.5, 0.05, 0.85);
+    let rcasSharp = center + (center - crossAvg) * (w * 1.25);
+
+    // Clamp ringing against direct neighbors
+    let minNeighbor = min(min(c0, c1), min(c2, c3));
+    let maxNeighbor = max(max(c0, c1), max(c2, c3));
+    let finalColor = clamp(mix(easuColor, rcasSharp, 0.75), minNeighbor, maxNeighbor);
+
+    return vec4(finalColor, 1.0);
+}
+)""";
+  const wgpu::ShaderModuleDescriptor fsrModuleDesc{
+      .nextInChain = &fsrSourceDesc,
+      .label = "XFB Copy Module (AMD FSR 1.0 / Eden)",
+  };
+  auto fsrModule = g_device.CreateShaderModule(&fsrModuleDesc);
+
   const std::array colorTargets{wgpu::ColorTargetState{
       .format = g_graphicsConfig.surfaceConfiguration.format,
       .writeMask = wgpu::ColorWriteMask::All,
@@ -467,6 +721,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
       .bindGroupLayouts = &g_CopyBindGroupLayout,
   };
   auto pipelineLayout = g_device.CreatePipelineLayout(&layoutDescriptor);
+
+  // 1. Bilinear pipeline (default)
   const wgpu::RenderPipelineDescriptor pipelineDescriptor{
       .layout = pipelineLayout,
       .vertex =
@@ -486,6 +742,42 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
       .fragment = &fragmentState,
   };
   g_CopyPipeline = g_device.CreateRenderPipeline(&pipelineDescriptor);
+
+  // 2. Nearest Neighbor pipeline
+  const wgpu::FragmentState nearestFragState{
+      .module = nearestModule,
+      .entryPoint = "fs_main",
+      .targetCount = colorTargets.size(),
+      .targets = colorTargets.data(),
+  };
+  wgpu::RenderPipelineDescriptor nearestPipeDesc = pipelineDescriptor;
+  nearestPipeDesc.vertex.module = nearestModule;
+  nearestPipeDesc.fragment = &nearestFragState;
+  g_CopyPipelineNearest = g_device.CreateRenderPipeline(&nearestPipeDesc);
+
+  // 3. Bicubic pipeline
+  const wgpu::FragmentState bicubicFragState{
+      .module = bicubicModule,
+      .entryPoint = "fs_main",
+      .targetCount = colorTargets.size(),
+      .targets = colorTargets.data(),
+  };
+  wgpu::RenderPipelineDescriptor bicubicPipeDesc = pipelineDescriptor;
+  bicubicPipeDesc.vertex.module = bicubicModule;
+  bicubicPipeDesc.fragment = &bicubicFragState;
+  g_CopyPipelineBicubic = g_device.CreateRenderPipeline(&bicubicPipeDesc);
+
+  // 4. AMD FSR 1.0 pipeline
+  const wgpu::FragmentState fsrFragState{
+      .module = fsrModule,
+      .entryPoint = "fs_main",
+      .targetCount = colorTargets.size(),
+      .targets = colorTargets.data(),
+  };
+  wgpu::RenderPipelineDescriptor fsrPipeDesc = pipelineDescriptor;
+  fsrPipeDesc.vertex.module = fsrModule;
+  fsrPipeDesc.fragment = &fsrFragState;
+  g_CopyPipelineFsr = g_device.CreateRenderPipeline(&fsrPipeDesc);
 }
 
 wgpu::BindGroup create_copy_bind_group(wgpu::TextureView sourceView, wgpu::Sampler sampler) {
@@ -945,6 +1237,9 @@ void shutdown() {
   g_initialized.store(false, std::memory_order_release);
   g_CopyBindGroupLayout = {};
   g_CopyPipeline = {};
+  g_CopyPipelineNearest = {};
+  g_CopyPipelineBicubic = {};
+  g_CopyPipelineFsr = {};
   g_CopyBindGroup = {};
   g_frameBuffer = {};
   g_frameBufferResolved = {};

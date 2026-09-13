@@ -38,6 +38,13 @@ typedef enum {
   AURORA_DISPLAY_MODE_EXCLUSIVE,
 } AuroraDisplayMode;
 
+typedef enum {
+  AURORA_SCALING_FILTER_BILINEAR = 0,
+  AURORA_SCALING_FILTER_NEAREST = 1,
+  AURORA_SCALING_FILTER_BICUBIC = 2,
+  AURORA_SCALING_FILTER_FSR = 3,
+} AuroraScalingFilter;
+
 typedef struct {
   int32_t x;
   int32_t y;
@@ -161,6 +168,11 @@ void aurora_set_pause_on_focus_lost(bool value);
 void aurora_set_background_input(bool value);
 void aurora_set_display_mode(AuroraDisplayMode mode);
 AuroraDisplayMode aurora_get_display_mode();
+
+void aurora_set_scaling_filter(AuroraScalingFilter filter);
+AuroraScalingFilter aurora_get_scaling_filter();
+void aurora_set_fsr_sharpness(float sharpness);
+float aurora_get_fsr_sharpness();
 
 AuroraBackend aurora_get_backend();
 const AuroraBackend* aurora_get_available_backends(size_t* count);

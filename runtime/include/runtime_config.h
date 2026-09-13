@@ -42,6 +42,8 @@ struct RuntimeUserConfig {
     std::optional<std::string> displayMode;
     std::optional<uint32_t> frameInterpolationFps;
     std::optional<bool> force30Fps;
+    std::optional<std::string> scalingFilter;
+    std::optional<float> fsrSharpness;
     std::optional<bool> skipUnreadyPipelines;
     std::optional<bool> disableCopyFilter;
     std::optional<bool> textureReplacements;
@@ -468,6 +470,8 @@ inline RuntimeUserConfig ParseConfigDocument(const toml::value& document) {
         }
     }
     config.force30Fps = FindConfigValue<bool>(document, "video", "force_30fps");
+    config.scalingFilter = FindConfigValue<std::string>(document, "video", "scaling_filter");
+    config.fsrSharpness = FindConfigFloat(document, "video", "fsr_sharpness");
     config.skipUnreadyPipelines = FindConfigValue<bool>(document, "video", "skip_unready_pipelines");
     config.disableCopyFilter = FindConfigValue<bool>(document, "video", "disable_copy_filter");
     config.showFps = FindConfigValue<bool>(document, "video", "show_fps");
@@ -694,6 +698,18 @@ inline bool SetSkipUnreadyPipelines(bool value) {
 inline bool SetForce30Fps(bool value) {
     Mutable().force30Fps = value;
     return WriteSetting("video", "force_30fps", value ? "true" : "false");
+}
+
+inline bool SetScalingFilter(std::string value) {
+    Mutable().scalingFilter = value;
+    return WriteSetting("video", "scaling_filter", FormatString(value));
+}
+
+inline bool SetFsrSharpness(float value) {
+    Mutable().fsrSharpness = value;
+    std::ostringstream formatted;
+    formatted << std::fixed << std::setprecision(2) << value;
+    return WriteSetting("video", "fsr_sharpness", formatted.str());
 }
 
 inline bool SetDisableCopyFilter(bool value) {
@@ -929,6 +945,14 @@ inline bool SkipUnreadyPipelines(bool fallback = true) {
 // Forces Mario Kart Wii's built-in 30 fps mode (3P/4P split-screen divider & physics) for low-end devices.
 inline bool Force30Fps(bool fallback = false) {
     return Get().force30Fps.value_or(fallback);
+}
+
+inline std::string ScalingFilter(std::string_view fallback = "bilinear") {
+    return Get().scalingFilter.value_or(std::string(fallback));
+}
+
+inline float FsrSharpness(float fallback = 0.8f) {
+    return std::clamp(Get().fsrSharpness.value_or(fallback), 0.0f, 1.0f);
 }
 
 inline bool DisableCopyFilter(bool fallback = true) {
