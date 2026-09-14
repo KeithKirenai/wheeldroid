@@ -315,6 +315,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val filterOptions = arrayOf(
+            "Off — Hardware / DPU Scale (Low-End)",
             "Bilinear (Standard)",
             "Nearest Neighbor (Integer / Sharp)",
             "Bicubic (Catmull-Rom)",
@@ -328,7 +329,7 @@ class MainActivity : AppCompatActivity() {
         val fsrSharpness = prefs.getInt("fsr_sharpness", 80)
         binding.sliderFsrSharpness.value = fsrSharpness.toFloat()
         binding.textFsrSharpness.text = "$fsrSharpness%"
-        binding.layoutFsrSharpness.visibility = if (savedFilterIdx == 3) View.VISIBLE else View.GONE
+        binding.layoutFsrSharpness.visibility = if (savedFilterIdx == 4) View.VISIBLE else View.GONE
         binding.sliderFsrSharpness.addOnChangeListener { _, value, _ ->
             binding.textFsrSharpness.text = "${value.toInt()}%"
         }
@@ -386,7 +387,7 @@ class MainActivity : AppCompatActivity() {
         val autoSaveSelected = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (parent == binding.spinnerScalingFilter) {
-                    binding.layoutFsrSharpness.visibility = if (position == 3) View.VISIBLE else View.GONE
+                    binding.layoutFsrSharpness.visibility = if (position == 4) View.VISIBLE else View.GONE
                 }
                 saveConfigOptions()
             }
@@ -412,6 +413,7 @@ class MainActivity : AppCompatActivity() {
 
         val resIdx = binding.sliderResolution.value.toInt().coerceIn(0, 5)
         val scalingFilterIdx = binding.spinnerScalingFilter.selectedItemPosition
+        val lowEndPresent = scalingFilterIdx == 0
         val fsrSharpness = binding.sliderFsrSharpness.value.toInt()
         val widescreen = binding.switchWidescreen.isChecked
         val extendToNotch = binding.switchExtendToNotch.isChecked
@@ -452,6 +454,7 @@ class MainActivity : AppCompatActivity() {
             .putInt("audio_sfx_volume", sfxVol)
             .putBoolean("audio_muted", audioMuted)
             .putBoolean("network_enabled", networkEnabled)
+            .putBoolean("low_end_present", lowEndPresent)
             .apply()
 
         val multiplier = when (resIdx) {
@@ -465,9 +468,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         val scalingFilterStr = when (scalingFilterIdx) {
-            1 -> "nearest"
-            2 -> "bicubic"
-            3 -> "fsr"
+            0 -> "nearest" // Low-end hardware / DPU scaling: 1:1 copy, SurfaceFlinger stretches to the panel
+            1 -> "bilinear"
+            2 -> "nearest"
+            3 -> "bicubic"
+            4 -> "fsr"
             else -> "bilinear"
         }
 

@@ -16,6 +16,23 @@ void VI_HLE_WaitForNextRetracePoll();
 // to the VI retrace boundary, pre-warm the next frame). paceToRetrace is true
 // for the GXCopyDisp producer path and false for retrace-context presents.
 void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace);
+
+// Per-second present-pacing summary, folded on the frame thread in
+// VI_HLE_PresentFrame and read by the FPS overlay / MKW-PERF logger. Lets a
+// production cliff (guest demanding 50 ms periods) be told apart from host
+// present-cadence problems using only on-screen metrics. Tracked in both 60 FPS
+// and forced-30 FPS modes; gridMs identifies the target period.
+struct ThirtyFpsPacingSummary {
+    bool active = false; // at least one fold completed (samples are being recorded)
+    uint32_t sampleCount = 0;
+    double avgPeriodMs = 0.0;      // mean gap between consecutive presents
+    double minPeriodMs = 0.0;
+    double maxPeriodMs = 0.0;
+    double avgRetracesElapsed = 0.0; // retraceCount consumed per presented frame
+    double gridMs = 0.0;             // VI retrace interval the guest runs on
+    double pacedFraction = 0.0;      // presents that had to wait on a retrace
+};
+ThirtyFpsPacingSummary GetThirtyFpsPacingSummary();
 bool VI_HLE_IsAdvancingRetrace();
 void VI_HLE_SetXfbReady(uint32_t xfbAddr); // Called by GXCopyDisp to signal EFB→XFB copy
 void Audio_HLE_Tick(CpuContext* ctx, uint32_t deltaMicros);

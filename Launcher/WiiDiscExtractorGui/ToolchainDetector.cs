@@ -30,7 +30,6 @@ public static class ToolchainDetector
     {
         string? localPropsPath = Path.Combine(workspaceRoot, "android", "local.properties");
         string? lpSdk = null;
-        string? lpNdk = null;
 
         if (File.Exists(localPropsPath))
         {
@@ -39,13 +38,11 @@ public static class ToolchainDetector
                 var trimmed = line.Trim();
                 if (trimmed.StartsWith("sdk.dir=", StringComparison.OrdinalIgnoreCase))
                     lpSdk = trimmed.Substring(8).Replace("\\\\", "\\").Trim();
-                else if (trimmed.StartsWith("ndk.dir=", StringComparison.OrdinalIgnoreCase))
-                    lpNdk = trimmed.Substring(8).Replace("\\\\", "\\").Trim();
             }
         }
 
         string? sdk = FindAndroidSdk(lpSdk);
-        string? ndk = FindNdk(sdk, lpNdk);
+        string? ndk = FindNdk(sdk);
         string? cmake = FindCMake(sdk);
         string? ninja = FindNinja(sdk, ndk);
         string? adb = FindAdb(sdk);
@@ -87,10 +84,9 @@ public static class ToolchainDetector
         return null;
     }
 
-    private static string? FindNdk(string? sdk, string? localPropsNdk)
+    private static string? FindNdk(string? sdk)
     {
         var candidates = new List<string?>();
-        if (!string.IsNullOrWhiteSpace(localPropsNdk)) candidates.Add(localPropsNdk);
         candidates.Add(Environment.GetEnvironmentVariable("ANDROID_NDK_HOME"));
         candidates.Add(Environment.GetEnvironmentVariable("ANDROID_NDK_ROOT"));
         candidates.Add(Environment.GetEnvironmentVariable("ANDROID_NDK"));

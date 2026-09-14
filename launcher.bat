@@ -18,14 +18,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%EXE%" (
-    echo Building WiiCompiled Android Setup Launcher...
-    dotnet build "%PROJECT%" -c Release --nologo -v q
-    if errorlevel 1 (
-        echo [ERROR] Failed to compile Setup Launcher.
-        pause
-        exit /b 1
-    )
+echo Building WiiCompiled Android Setup Launcher (incremental; skips when up to date)...
+dotnet build "%PROJECT%" -c Release --nologo -v q
+if errorlevel 1 (
+    echo [ERROR] Failed to compile Setup Launcher.
+    pause
+    exit /b 1
 )
 
 echo Launching Setup Launcher...

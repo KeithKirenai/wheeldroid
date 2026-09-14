@@ -174,9 +174,11 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
 
         touchOverlayContainer = findViewById(R.id.touchOverlayContainer)
 
-        // Universal hardware scaling for mobile GPUs:
-        // Configures the SurfaceView buffer resolution so lower-end GPUs don't choke on 1080p/1440p panels,
-        // letting the device's hardware display processor (DPU) scale the surface with zero GPU overhead.
+        // Optional low-end direct scaling (old SurfaceFlinger path):
+        // Configures the SurfaceView buffer to a small fixed size matching the internal render
+        // resolution, so the device's hardware display processor (DPU) stretches it to the panel
+        // with zero GPU fill-rate in the game process. Shader upscalers are bypassed entirely.
+        val lowEndPresent = prefs.getBoolean("low_end_present", false)
         val resIdx = prefs.getInt("resolution_idx", 2)
         touchControlsEnabled = prefs.getBoolean("touch_controls", true)
         tiltControlsEnabled = prefs.getBoolean("tilt_controls", true)
@@ -202,14 +204,32 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         val screenH = metrics.heightPixels
         val aspect = if (screenH > 0) screenW.toFloat() / screenH.toFloat() else (16f / 9f)
 
-        // For shader upscaling (FSR 1.0, Bicubic, Nearest Neighbor) and native rendering,
-        // the SurfaceView buffer must match the physical display resolution (setSizeFromLayout).
-        // Aurora renders internally at the chosen resolution multiplier (0.5x, 0.75x, 1.0x, etc.)
-        // and then its presentation shader upscales directly to the full-resolution swapchain.
-        // If setFixedSize was used, Android's SurfaceFlinger hardware composer would bilinearly stretch
-        // the low-res surface across the screen, bypassing and blurring the shader upscaler!
-        surfaceView.holder.setSizeFromLayout()
-        android.util.Log.i("WiiCompiled", "SurfaceView configured for full panel resolution: ${screenW}x${screenH} (resIdx: $resIdx, mult: $activeResMultiplier)")
+        if (lowEndPresent) {
+            // Low-end direct scaling: render into a small buffer (matching the internal resolution)
+            // and let SurfaceFlinger bilinearly stretch it to the full panel. No shader upscaler is
+            // used, so fill rate stays at the internal resolution instead of the panel resolution.
+            val targetH = when (resIdx) {
+                0 -> 264   // 0.5x (240p/264p)
+                1 -> 396   // 0.75x (360p/396p)
+                2 -> 528   // 1.0x (480p/528p Native)
+                3 -> 792   // 1.5x (720p/792p HD)
+                4 -> 1056  // 2.0x (960p/1056p FHD)
+                5 -> 1584  // 3.0x (1440p/1584p QHD)
+                else -> 528
+            }
+            val targetW = (targetH * aspect).toInt().coerceAtLeast(1)
+            surfaceView.holder.setFixedSize(targetW, targetH)
+            android.util.Log.i("WiiCompiled", "Low-end hardware scaling configured: ${targetW}x${targetH} (SurfaceFlinger scales to ${screenW}x${screenH})")
+        } else {
+            // For shader upscaling (FSR 1.0, Bicubic, Nearest Neighbor) and native rendering,
+            // the SurfaceView buffer must match the physical display resolution (setSizeFromLayout).
+            // Aurora renders internally at the chosen resolution multiplier (0.5x, 0.75x, 1.0x, etc.)
+            // and then its presentation shader upscales directly to the full-resolution swapchain.
+            // If setFixedSize was used, Android's SurfaceFlinger hardware composer would bilinearly stretch
+            // the low-res surface across the screen, bypassing and blurring the shader upscaler!
+            surfaceView.holder.setSizeFromLayout()
+            android.util.Log.i("WiiCompiled", "SurfaceView configured for full panel resolution: ${screenW}x${screenH} (resIdx: $resIdx, mult: $activeResMultiplier)")
+        }
 
         surfaceView.holder.addCallback(this)
         surfaceView.setOnTouchListener(null)

@@ -128,3 +128,10 @@ target_link_libraries(mkw_android PRIVATE
     -Wl,--whole-archive mkw_base_shared -Wl,--no-whole-archive
     mkw_cryptopp
 )
+
+# Bind all internal function references to their definitions inside this .so
+# instead of routing them through the PLT/GOT. The prebuilt shard archive was
+# compiled with default symbol visibility, so every generated-to-generated guest
+# call, every generated -> HLE call and every HLE -> generated call currently
+# pays a PLT+GOT indirection (root-caused from the in-race simpleperf profile).
+target_link_options(mkw_android PRIVATE "LINKER:-Bsymbolic-functions")

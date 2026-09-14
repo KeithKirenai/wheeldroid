@@ -156,6 +156,10 @@ bool aurora_wait_for_frame_worker_for(uint32_t timeoutMicros);
 // Absolute schedule for the next sealed frame, on steady_clock: baseNanos anchors the group and
 // intervalNanos is the period, so slot k of N+1 fires at base + k*interval/(N+1). Zeros clear it.
 void aurora_set_present_schedule(uint64_t baseNanos, uint64_t intervalNanos);
+// Force-30 display pacing: present every intervalNanos on the guest's VI grid (baseNanos anchors it
+// on steady_clock), duplicating the last sealed snapshot on ticks that have no new frame so a
+// 33 -> 50 ms guest slip reads as a steady cadence instead of a 20 FPS cliff. Zeros clear it.
+void aurora_set_present_duplicate_grid(uint64_t baseNanos, uint64_t intervalNanos);
 // Reports whether the frame about to be sealed met its display boundary. Interpolation sizes its
 // slot group from this, backing off after misses. Only paced presents may report.
 void aurora_report_producer_paced(bool paced);

@@ -420,11 +420,11 @@ bool AdvanceDueRetraces(CpuContext* ctx, int maxToProcess, bool serviceAurora)
                 return advancedAny;
             }
             target = g_vi.lastRetrace + g_vi.retraceInterval;
-            // Coming out of pause (Android backgrounding) the wall clock jumped
-            // far past the last delivered retrace because AdvanceRetrace is
-            // gated while paused. Snap the VI timeline to now instead of
-            // allowing the catch-up burst of expired intervals.
-            if (now > target + 2 * g_vi.retraceInterval) {
+            // Resume snap: only a pause-scale stall (Android backgrounding) may jump the
+            // timeline. Load spikes of a few periods keep their due retraces so the guest's
+            // frame/framerate counters stay faithful; snapping here would silently skip them
+            // and (in Force-30 mode) push the guest an extra display period behind.
+            if (now > target + 8 * g_vi.retraceInterval) {
                 g_vi.lastRetrace = now - g_vi.retraceInterval;
                 target = g_vi.lastRetrace + g_vi.retraceInterval;
             }
@@ -531,6 +531,76 @@ uint32_t s_lastPacedRetraceCount = ~0u;
 // comment at the stamping site). Producer-thread only, like the memo above.
 uint64_t s_lastPresentAnchorNanos = 0;
 
+// Present pacing profiler: accumulates per-seal metrics for one second and
+// folds them into a ThirtyFpsPacingSummary for the FPS overlay and the
+// MKW-PERF log line. Runs in both 60 FPS and forced-30 FPS modes so guest
+// production stalls are visible either way (gridMs distinguishes the target:
+// ~16.7 ms at 60, ~33.3 ms at forced-30). All fields are touched only from the
+// producer thread inside VI_HLE_PresentFrame, so no synchronization is needed.
+uint64_t s_pacingProfileEpochMs = 0;
+uint32_t s_pacingSampleCount = 0;
+double s_pacingPeriodSumMs = 0.0;
+double s_pacingPeriodMinMs = 0.0;
+double s_pacingPeriodMaxMs = 0.0;
+double s_pacingRetracesSum = 0.0;
+double s_pacingGridSumMs = 0.0;
+uint32_t s_pacingPacedCount = 0;
+ThirtyFpsPacingSummary s_pacingSummary;
+Clock::time_point s_lastPresentProbe{};
+
+// Records one produced (sealed) frame against the grid so a 33.3 ms -> 50 ms
+// cliff in forced-30 (or 16.7 ms -> 50 ms in 60 FPS) is visible as
+// `avgPeriodMs` with a matching `avgRetracesElapsed`: ~1 on the healthy 60 FPS
+// grid, ~2 on the healthy forced-30 grid, more when a late frame fell through.
+void RecordPresentPacing(double gridMs, uint32_t retracesElapsed, bool paced) {
+    const auto now = Clock::now();
+    double periodMs = 0.0;
+    if (s_lastPresentProbe != Clock::time_point{}) {
+        periodMs = std::chrono::duration<double, std::milli>(now - s_lastPresentProbe).count();
+    }
+    s_lastPresentProbe = now;
+
+    const uint64_t nowMs = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count());
+    if (s_pacingProfileEpochMs != 0 && nowMs - s_pacingProfileEpochMs >= 1000 && s_pacingSampleCount > 0) {
+        s_pacingSummary = ThirtyFpsPacingSummary{
+            .active = true,
+            .sampleCount = s_pacingSampleCount,
+            .avgPeriodMs = s_pacingPeriodSumMs / s_pacingSampleCount,
+            .minPeriodMs = s_pacingPeriodMinMs,
+            .maxPeriodMs = s_pacingPeriodMaxMs,
+            .avgRetracesElapsed = s_pacingRetracesSum / s_pacingSampleCount,
+            .gridMs = s_pacingGridSumMs / s_pacingSampleCount,
+            .pacedFraction = static_cast<double>(s_pacingPacedCount) / s_pacingSampleCount,
+        };
+        RT_LOGF(RT_TAG_VI,
+                "present profile: n=%u avg=%.1fms min=%.1f max=%.1f retraceDelta=%.2f grid=%.1fms paced=%.0f%%\n",
+                s_pacingSampleCount, s_pacingSummary.avgPeriodMs, s_pacingPeriodMinMs,
+                s_pacingPeriodMaxMs, s_pacingSummary.avgRetracesElapsed, s_pacingSummary.gridMs,
+                s_pacingSummary.pacedFraction * 100.0);
+        s_pacingSampleCount = 0;
+        s_pacingPeriodSumMs = 0.0;
+        s_pacingPeriodMinMs = 0.0;
+        s_pacingPeriodMaxMs = 0.0;
+        s_pacingRetracesSum = 0.0;
+        s_pacingGridSumMs = 0.0;
+        s_pacingPacedCount = 0;
+    }
+    s_pacingProfileEpochMs = (s_pacingProfileEpochMs == 0) ? nowMs : s_pacingProfileEpochMs;
+    if (s_pacingSampleCount == 0) {
+        s_pacingPeriodMinMs = periodMs;
+    }
+    ++s_pacingSampleCount;
+    s_pacingPeriodSumMs += periodMs;
+    s_pacingPeriodMinMs = std::min(s_pacingPeriodMinMs, periodMs);
+    s_pacingPeriodMaxMs = std::max(s_pacingPeriodMaxMs, periodMs);
+    s_pacingRetracesSum += static_cast<double>(retracesElapsed);
+    s_pacingGridSumMs += gridMs;
+    if (paced) {
+        ++s_pacingPacedCount;
+    }
+}
+
 // Sleeps to the same VI retrace boundary VIWaitForRetrace targets, servicing alarms every 1 ms so audio
 // DMA and timers keep running, then delivers that retrace so guest logic starts exactly on the grid.
 void PaceToRetraceBoundary(Clock::time_point deadline) {
@@ -557,6 +627,8 @@ void PaceToRetraceBoundary(Clock::time_point deadline) {
 }
 
 } // namespace
+
+ThirtyFpsPacingSummary GetThirtyFpsPacingSummary() { return s_pacingSummary; }
 
 // Single owner of the Aurora frame presentation sequence: seals the active frame, optionally paces the
 // producer to the VI retrace boundary, and pre-warms the next frame. Paced from GXCopyDisp; unpaced for
@@ -608,12 +680,23 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
         // same grid, so this stays the single cadence authority. Anchors must also be strictly
         // monotonic: two frames sealed before lastRetrace advances would collide on one boundary and
         // burst-present, so a colliding anchor steps onto the next grid point instead of repeating it.
-        uint64_t anchorNanos = baseNanos + intervalNanos;
+        const bool is30Fps = RuntimeGameGraphicsOptions::Force30Fps();
+        const uint64_t targetIntervalNanos = is30Fps ? (intervalNanos * 2) : intervalNanos;
+
+        uint64_t anchorNanos = baseNanos + targetIntervalNanos;
         if (s_lastPresentAnchorNanos != 0 && anchorNanos <= s_lastPresentAnchorNanos) {
-            anchorNanos = s_lastPresentAnchorNanos + intervalNanos;
+            anchorNanos = s_lastPresentAnchorNanos + targetIntervalNanos;
         }
         s_lastPresentAnchorNanos = anchorNanos;
-        aurora_set_present_schedule(anchorNanos, intervalNanos);
+        aurora_set_present_schedule(anchorNanos, targetIntervalNanos);
+        // Both 30 FPS and 60 FPS benefit from a steady presentation grid:
+        // - 30 FPS uses 2 * interval (~33.3ms) to avoid 16.6ms false duplicate bursts
+        // - 60 FPS uses interval (~16.6ms) to lock presentation smoothly to the display cadence
+        aurora_set_present_duplicate_grid(anchorNanos, targetIntervalNanos);
+
+        // Pacing diagnostic feed: one sample per sealed native frame.
+        RecordPresentPacing(static_cast<double>(targetIntervalNanos) / 1e6, retracesElapsed,
+                            paceThisFrame);
     } else {
         // Retrace-context presents (VI black, boot) have no display period of
         // their own to subdivide; present as soon as the frame is ready. The
@@ -621,6 +704,7 @@ void VI_HLE_PresentFrame(bool presentedXfb, bool paceToRetrace) {
         // next paced frame.
         s_lastPresentAnchorNanos = 0;
         aurora_set_present_schedule(0, 0);
+        aurora_set_present_duplicate_grid(0, 0);
     }
 
     aurora_end_frame();

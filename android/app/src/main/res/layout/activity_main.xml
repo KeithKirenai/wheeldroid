@@ -228,7 +228,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Post-processing shader (Eden / FSR)"
+                            android:text="Off = low-end SurfaceFlinger scaling, no shader upscaler"
                             android:textColor="@color/md_theme_dark_onSurfaceVariant"
                             android:textSize="12sp" />
                     </LinearLayout>

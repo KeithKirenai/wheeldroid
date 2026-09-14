@@ -1068,25 +1068,131 @@ struct PresenterState {
 PresenterState g_presenter;
 std::atomic<bool> g_presenterStarted{false};
 
+// Force-30 display pacing configuration, stamped by the producer from the VI retrace grid
+// (steady_clock). A nonzero interval makes the presenter hold every present on that grid,
+// duplicating the last sealed snapshot on ticks that saw no new frame.
+std::atomic<uint64_t> g_presentGridBaseNanos{0};
+std::atomic<uint64_t> g_presentGridIntervalNanos{0};
+
 void presenter_main() noexcept {
   if (!SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH)) {
     Log.warn("Could not raise the asynchronous presenter thread priority: {}", SDL_GetError());
   }
+
+  // Force-30 display pacing state. `lastImage` is retained across ticks so a grid slot with no
+  // new frame can duplicate the previous snapshot; dropping it on the next new frame lets the
+  // pool recycle it (its own reference + the pool's keeps it live while it is being presented).
+  std::shared_ptr<PresentationImage> lastImage;
+  uint32_t lastLogicalFrame = 0;
+  bool haveLastImage = false;
+  PresentClock::time_point gridTick{};
+  uint64_t activeGridInterval = 0;
+
   for (;;) {
+    const uint64_t gridInterval = g_presentGridIntervalNanos.load(std::memory_order_acquire);
+    const uint64_t gridBase = g_presentGridBaseNanos.load(std::memory_order_acquire);
+    const bool gridActive = gridInterval != 0;
+
     PresentationJob job;
+    bool newFrame = false;
+    bool stop = false;
     {
       std::unique_lock lock(g_presenter.mutex);
-      g_presenter.cv.wait(lock, [] { return g_presenter.stop || !g_presenter.jobs.empty(); });
-      if (g_presenter.stop && g_presenter.jobs.empty()) {
-        break;
+      if (!gridActive) {
+        // Original path: wait for a job, present as soon as it is available.
+        g_presenter.cv.wait(lock, [] { return g_presenter.stop || !g_presenter.jobs.empty(); });
+        if (g_presenter.stop && g_presenter.jobs.empty()) {
+          stop = true;
+        } else {
+          job = std::move(g_presenter.jobs.front());
+          g_presenter.jobs.pop_front();
+          newFrame = true;
+        }
+      } else {
+        // Grid path: tune to the VI period, then wake at every tick. A job that
+        // arrived before the tick is held to the tick; a tick with no job
+        // duplicates the last sealed snapshot, so presentation never leaves the
+        // cadence even when the guest slips a whole period.
+        if (gridInterval != activeGridInterval) {
+          const auto now = PresentClock::now();
+          const auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 now.time_since_epoch())
+                                 .count();
+          const uint64_t periods = nowNs >= static_cast<int64_t>(gridBase)
+                                       ? (static_cast<uint64_t>(nowNs - gridBase) / gridInterval) + 1
+                                       : 1;
+          gridTick = PresentClock::time_point{std::chrono::nanoseconds{
+              static_cast<int64_t>(gridBase + periods * gridInterval)}};
+          activeGridInterval = gridInterval;
+        }
+
+        // Wait until gridTick or until a new job / stop arrives
+        g_presenter.cv.wait_until(lock, gridTick,
+                                  [] { return g_presenter.stop || !g_presenter.jobs.empty(); });
+        if (g_presenter.stop && g_presenter.jobs.empty()) {
+          stop = true;
+        } else if (!g_presenter.jobs.empty()) {
+          job = std::move(g_presenter.jobs.front());
+          g_presenter.jobs.pop_front();
+          newFrame = true;
+
+          // If the job specifies a future presentAt anchor from the producer schedule,
+          // align gridTick to match it within reasonable threshold to eliminate phase drift
+          if (job.presentAt != PresentClock::time_point{}) {
+            if (job.presentAt >= gridTick) {
+              gridTick = job.presentAt;
+            }
+          }
+        }
       }
-      job = std::move(g_presenter.jobs.front());
-      g_presenter.jobs.pop_front();
       g_presenter.presenting = true;
     }
     g_presenter.cv.notify_all();
 
+    if (stop) {
+      break;
+    }
+
+    if (newFrame) {
+      lastImage = job.image;
+      lastLogicalFrame = job.logicalFrame;
+      haveLastImage = true;
+    } else if (gridActive && haveLastImage) {
+      job = PresentationJob{.image = lastImage,
+                            .logicalFrame = lastLogicalFrame,
+                            .duplicated = true};
+    } else {
+      // Non-grid spurious wakeup, or the grid has no history to duplicate yet.
+      {
+        std::lock_guard lock(g_presenter.mutex);
+        g_presenter.presenting = false;
+      }
+      g_presenter.cv.notify_all();
+      continue;
+    }
+
+    if (gridActive) {
+      job.presentAt = gridTick;
+    }
     present_presentation_job(job);
+
+    if (gridActive) {
+      // March to the next period. A slot that overshot its interval resyncs to
+      // the next grid point after now instead of stacking back-to-back slots.
+      const auto now = PresentClock::now();
+      if (now >= gridTick) {
+        const auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               now.time_since_epoch())
+                               .count();
+        const uint64_t periods = nowNs >= static_cast<int64_t>(gridBase)
+                                     ? (static_cast<uint64_t>(nowNs - gridBase) / gridInterval) + 1
+                                     : 1;
+        gridTick = PresentClock::time_point{std::chrono::nanoseconds{
+            static_cast<int64_t>(gridBase + periods * gridInterval)}};
+      } else {
+        gridTick += std::chrono::nanoseconds{static_cast<int64_t>(gridInterval)};
+      }
+    }
 
     {
       std::lock_guard lock(g_presenter.mutex);
@@ -1401,17 +1507,15 @@ std::vector<PresentationJob> encode_sealed_frame(gfx::SealedFrame& sealedFrame, 
   const auto encoderDescriptor = wgpu::CommandEncoderDescriptor{
       .label = "Redraw encoder",
   };
-  // Absolute slot deadlines: slot k of jobCount presents at base + k * interval / jobCount. With
-  // interpolation off, pace to the boundary that just passed plus 6.5 ms; late frames free-run.
-  constexpr uint64_t kNativePresentOffsetNanos = 6'500'000;
+  // Absolute slot deadlines: slot k of jobCount presents at base + k * interval / jobCount.
+  // For native frames, target the scheduled boundary (scheduleBaseNanos).
   const uint32_t presentationJobCount = ctx.interpolatedFrameCount + 1;
   const auto slotPresentDeadline = [&](uint32_t slot) -> PresentClock::time_point {
     if (ctx.scheduleBaseNanos == 0 || ctx.scheduleIntervalNanos == 0) {
       return {};
     }
     if (!ctx.interpolationActive) {
-      return PresentClock::time_point{std::chrono::nanoseconds{
-          ctx.scheduleBaseNanos - ctx.scheduleIntervalNanos + kNativePresentOffsetNanos}};
+      return PresentClock::time_point{std::chrono::nanoseconds{ctx.scheduleBaseNanos}};
     }
     const uint64_t offsetNanos =
         (ctx.scheduleIntervalNanos * static_cast<uint64_t>(slot)) / presentationJobCount;
@@ -1828,6 +1932,10 @@ bool aurora_wait_for_frame_worker_for(uint32_t timeoutMicros) {
 void aurora_set_present_schedule(uint64_t baseNanos, uint64_t intervalNanos) {
   aurora::g_presentScheduleBaseNanos.store(baseNanos, std::memory_order_release);
   aurora::g_presentScheduleIntervalNanos.store(intervalNanos, std::memory_order_release);
+}
+void aurora_set_present_duplicate_grid(uint64_t baseNanos, uint64_t intervalNanos) {
+  aurora::g_presentGridBaseNanos.store(baseNanos, std::memory_order_release);
+  aurora::g_presentGridIntervalNanos.store(intervalNanos, std::memory_order_release);
 }
 void aurora_report_producer_paced(bool paced) {
 #ifdef AURORA_ENABLE_GX

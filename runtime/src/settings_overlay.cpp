@@ -1,6 +1,7 @@
 #include "settings_overlay.h"
 #include "audio_backend.h"
 #include "controller_mapping_wizard.h"
+#include "hle_stubs.h"
 #include "game_graphics_options.h"
 #include "music_attenuation.h"
 #include "runtime_config.h"
@@ -21,6 +22,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <iostream>
 #include <string>
@@ -34,6 +36,8 @@
 #endif
 #if defined(__ANDROID__)
 #include <android/log.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 #endif
 
 #include <dolphin/pad.h>
@@ -53,6 +57,80 @@ void SetMixWorkerEnabled(bool enabled);
 
 namespace settings_overlay {
 namespace {
+
+#if defined(__ANDROID__)
+// Returns utime+stime (in clock ticks) for the calling thread. The MKW-PERF
+// logger runs on the emulated producer thread, so this measures how much wall
+// time that thread really occupies the CPU between log windows. Splitting the
+// frame dwell (1000 / Real) into compute (CPU seconds) vs wait is the Phase 3
+// root-cost probe for the ~40 ms between sealed guest frames.
+//
+// Parsing rule: tokens after the last ')' in /proc/.../stat map as token i ->
+// field i+3. The state field (token 0, e.g. 'R') is non-numeric, so each token
+// must be consumed to its trailing space before strtoull is used, otherwise the
+// iterator stalls on the state letter and every later field reads 0.
+uint64_t ReadEmuThreadCpuTicks() noexcept {
+    static bool s_readWarned = false;
+    char path[72];
+    const long tid = static_cast<long>(::syscall(SYS_gettid));
+    snprintf(path, sizeof(path), "/proc/self/task/%ld/stat", tid);
+    FILE* f = fopen(path, "r");
+    if (!f) {
+        if (!s_readWarned) {
+            s_readWarned = true;
+            __android_log_print(ANDROID_LOG_WARN, "MKW-PERF",
+                                "EmuCPU: open %s failed", path);
+        }
+        return 0;
+    }
+    char buf[512];
+    const size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    if (n == 0) {
+        if (!s_readWarned) {
+            s_readWarned = true;
+            __android_log_print(ANDROID_LOG_WARN, "MKW-PERF",
+                                "EmuCPU: empty %s", path);
+        }
+        return 0;
+    }
+    buf[n] = '\0';
+    const char* closeParen = nullptr;
+    for (const char* p = buf; *p != '\0'; ++p) {
+        if (*p == ')') {
+            closeParen = p;
+        }
+    }
+    if (!closeParen) {
+        return 0;
+    }
+    const char* it = closeParen + 1;
+    uint64_t sum = 0;
+    bool parsedTail = false;
+    for (int field = 3; field <= 15 && *it != '\0'; ++field) {
+        while (*it == ' ') {
+            ++it;
+        }
+        const char* tokStart = it;
+        while (*it != '\0' && *it != ' ') {
+            ++it;
+        }
+        if (field == 14) {  // utime
+            sum += static_cast<uint64_t>(strtoull(tokStart, nullptr, 10));
+        } else if (field == 15) {  // stime
+            sum += static_cast<uint64_t>(strtoull(tokStart, nullptr, 10));
+            parsedTail = true;
+            break;
+        }
+    }
+    if (!parsedTail && !s_readWarned) {
+        s_readWarned = true;
+        __android_log_print(ANDROID_LOG_WARN, "MKW-PERF",
+                            "EmuCPU: short stat line: %.80s", buf);
+    }
+    return sum;
+}
+#endif
 
 const char* GraphicsApiDisplayName() {
     switch (aurora_get_backend()) {
@@ -865,6 +943,28 @@ void DrawFpsOverlay() {
             ImGui::SameLine();
             ImGui::Text("(%.1fms)", presentTiming.averageFrameTimeMs);
 
+            // Present pacing diagnostic: reveals when guest production falls off
+            // the retrace grid in either mode. "MISS" = the average frame needed
+            // more retraces than its grid target (30 -> 20 FPS quantization in
+            // forced-30); "STALL" = wall time exceeded the retraces actually
+            // consumed (the retrace grid itself lagged behind).
+            if (const ThirtyFpsPacingSummary pacing = GetThirtyFpsPacingSummary();
+                pacing.active && pacing.sampleCount > 0) {
+                const double consumedMs = pacing.avgRetracesElapsed * pacing.gridMs;
+                const double targetRetraces = pacing.gridMs >= 33.0 ? 2.0 : 1.0;
+                const bool missedGrid = pacing.avgRetracesElapsed > targetRetraces * 1.25;
+                const bool stalled = pacing.avgPeriodMs > consumedMs * 1.15;
+                const char* verdict = missedGrid ? "MISS" : (stalled ? "STALL" : "OK  ");
+                const ImVec4 color = (missedGrid || stalled)
+                                         ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                         : ImVec4(0.4f, 1.0f, 0.4f, 1.0f);
+                const int fpsLabel = static_cast<int>(std::lround(1000.0 / pacing.gridMs));
+                ImGui::TextColored(color,
+                                   "%dFPS %s: avg %.1fms min %.1f max %.1f | grid %.0fms retdelta %.2f",
+                                   fpsLabel, verdict, pacing.avgPeriodMs, pacing.minPeriodMs,
+                                   pacing.maxPeriodMs, pacing.gridMs, pacing.avgRetracesElapsed);
+            }
+
             // Per-pass encoder breakdown (CPU command-encode ms, native frame only)
             if (g_showFpsPasses) {
                 AuroraGpuPassTimings gpuPassTimings;
@@ -940,17 +1040,63 @@ void DrawFpsOverlay() {
                 }
             }
 #if defined(__ANDROID__)
-            static uint32_t s_logPerfCounter = 0;
-            if (++s_logPerfCounter >= 60) {
-                s_logPerfCounter = 0;
+            // MKW-PERF is anchored to *sealed guest frames*, not swapchain present
+            // slots: the presenter replays the last image on empty grid ticks, so
+            // gating on presents keeps the readout at grid cadence even when the
+            // game is barely producing. Log after every 60 sealed frames, with a
+            // heartbeat fallback so a stalled-but-alive session stays visible.
+            static uint64_t s_lastPerfLogSeal = 0;
+            static std::chrono::steady_clock::time_point s_lastPerfLogWall{};
+            const uint64_t sealedSinceLast = g_presentedFrame - s_lastPerfLogSeal;
+            const auto perfNow = std::chrono::steady_clock::now();
+            const bool perfHeartbeat = (s_lastPerfLogWall != std::chrono::steady_clock::time_point{}) &&
+                                       perfNow - s_lastPerfLogWall >= std::chrono::seconds(5);
+            if (sealedSinceLast >= 60 || perfHeartbeat) {
+                s_lastPerfLogSeal = g_presentedFrame;
+                s_lastPerfLogWall = perfNow;
+                static uint64_t s_lastEmuCpuTicks = 0;
+                static std::chrono::steady_clock::time_point s_lastEmuCpuWall{};
+                const uint64_t emuTicks = ReadEmuThreadCpuTicks();
+                if (emuTicks > 0 && s_lastEmuCpuTicks > 0 &&
+                    s_lastEmuCpuWall != std::chrono::steady_clock::time_point{}) {
+                    const double wallSec =
+                        std::chrono::duration<double>(perfNow - s_lastEmuCpuWall).count();
+                    const double cpuSec = static_cast<double>(emuTicks - s_lastEmuCpuTicks) /
+                                          static_cast<double>(sysconf(_SC_CLK_TCK));
+                    if (wallSec > 0.0) {
+                        const double utilPct = std::min(400.0, 100.0 * cpuSec / wallSec);
+                        const double dwellMs = (presentTiming.effectiveFramesPerSecond > 0.0)
+                                                   ? 1000.0 / presentTiming.effectiveFramesPerSecond
+                                                   : 0.0;
+                        __android_log_print(ANDROID_LOG_INFO, "MKW-PERF",
+                            "EmuCPU: %.0f%% of one core | compute ~ %.1fms/live frame",
+                            utilPct, dwellMs * utilPct / 100.0);
+                    }
+                }
+                s_lastEmuCpuTicks = emuTicks;
+                s_lastEmuCpuWall = perfNow;
+                const double dupPct =
+                    (presentTiming.framesPerSecond > 0.0)
+                        ? 100.0 - 100.0 * presentTiming.effectiveFramesPerSecond / presentTiming.framesPerSecond
+                        : 100.0;
                 __android_log_print(ANDROID_LOG_INFO, "MKW-PERF",
-                    "FPS: %.1f (%.1fms) | Draws: %u (+%u merged) | Geom: %.0fKB | Builds: %u",
+                    "FPS: %.1f (%.1fms) | Real: %.1f (dup %.0f%%, p95 %.1fms) | Draws: %u (+%u merged) | Geom: %.0fKB | Builds: %u",
                     presentTiming.framesPerSecond,
                     presentTiming.averageFrameTimeMs,
+                    presentTiming.effectiveFramesPerSecond,
+                    dupPct,
+                    presentTiming.p95FrameTimeMs,
                     stats ? stats->drawCallCount : 0,
                     stats ? stats->mergedDrawCallCount : 0,
                     stats ? static_cast<float>(stats->lastVertSize + stats->lastIndexSize) / 1024.0f : 0.0f,
                     stats ? stats->queuedPipelines : 0);
+                if (const ThirtyFpsPacingSummary pacing = GetThirtyFpsPacingSummary();
+                    pacing.active && pacing.sampleCount > 0) {
+                    __android_log_print(ANDROID_LOG_INFO, "MKW-PERF",
+                        "PACE: avg=%.1fms min=%.1f max=%.1f grid=%.1fms retraceDelta=%.2f paced=%.0f%%",
+                        pacing.avgPeriodMs, pacing.minPeriodMs, pacing.maxPeriodMs,
+                        pacing.gridMs, pacing.avgRetracesElapsed, pacing.pacedFraction * 100.0);
+                }
                 AuroraGpuPassTimings gpuPassTimings;
                 aurora_get_gpu_pass_timings(&gpuPassTimings);
                 if (gpuPassTimings.count > 0) {

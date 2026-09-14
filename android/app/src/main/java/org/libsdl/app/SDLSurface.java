@@ -96,6 +96,16 @@ public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
         Log.v("SDL", "surfaceCreated()");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Surface surface = holder.getSurface();
+                if (surface != null && surface.isValid()) {
+                    surface.setFrameRate(60.0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+                }
+            } catch (Exception e) {
+                Log.w("SDL", "Failed to set Surface frame rate: " + e.getMessage());
+            }
+        }
         SDLActivity.onNativeSurfaceCreated();
     }
 
