@@ -28,6 +28,7 @@ set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("${MKW_AURORA_DIR}" "${CMAKE_BINARY_DIR}/aurora-build" EXCLUDE_FROM_ALL)
+add_subdirectory(libadrenotools)
 
 include_directories(
     "${MKW_RUNTIME_DIR}/include"
@@ -125,6 +126,7 @@ target_link_libraries(mkw_android PRIVATE
     aurora::si
     aurora::vi
     aurora::mtx
+    adrenotools
     -Wl,--whole-archive mkw_base_shared -Wl,--no-whole-archive
     mkw_cryptopp
 )

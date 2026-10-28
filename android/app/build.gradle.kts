@@ -135,6 +135,7 @@ android {
 
     packaging {
         jniLibs {
+            useLegacyPackaging = true
             excludes += listOf("**/libmkw_base_shared.a")
         }
     }

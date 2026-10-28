@@ -1,3 +1,6 @@
+#include <dlfcn.h>
+#include <adrenotools/driver.h>
+#include <adrenotools/priv.h>
 #include <jni.h>
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
@@ -191,12 +194,53 @@ static void GameRenderWorker() {
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_wiicompiled_mkw_GameActivity_nativeInit(JNIEnv* env, jobject thiz, jstring internalPath, jfloat resMultiplier) {
+Java_com_wiicompiled_mkw_GameActivity_nativeInit(JNIEnv* env, jobject thiz, jstring internalPath, jfloat resMultiplier, jstring nativeLibDir, jstring customDriverDir, jstring customDriverName) {
     if (!g_javaVM && env) {
         env->GetJavaVM(&g_javaVM);
         LOGI("nativeInit captured JavaVM: %p", g_javaVM);
     }
     StartLogcatRedirect();
+    // Initialize Custom Adreno / Turnip Driver if requested
+    if (nativeLibDir) {
+        const char* hookLibDirStr = env->GetStringUTFChars(nativeLibDir, nullptr);
+        const char* driverDirStr = customDriverDir ? env->GetStringUTFChars(customDriverDir, nullptr) : nullptr;
+        const char* driverNameStr = customDriverName ? env->GetStringUTFChars(customDriverName, nullptr) : nullptr;
+
+        int featureFlags = 0;
+        if (driverDirStr && driverNameStr && driverDirStr[0] != '\0' && driverNameStr[0] != '\0') {
+            featureFlags |= ADRENOTOOLS_DRIVER_CUSTOM;
+            LOGI("Attempting to load custom Turnip driver: %s from %s (hooks: %s)", driverNameStr, driverDirStr, hookLibDirStr);
+        } else {
+            LOGI("Using default system Vulkan driver (adrenotools hookLib: %s)", hookLibDirStr);
+        }
+
+        void* vulkanHandle = adrenotools_open_libvulkan(
+            RTLD_NOW,
+            featureFlags,
+            nullptr, // tmpLibDir (nullptr uses memfd on API 29+)
+            hookLibDirStr,
+            driverDirStr,
+            driverNameStr,
+            nullptr,
+            nullptr
+        );
+
+        if (vulkanHandle) {
+            LOGI("adrenotools_open_libvulkan succeeded, handle: %p", vulkanHandle);
+            if (featureFlags & ADRENOTOOLS_DRIVER_CUSTOM && driverNameStr) {
+                settings_overlay::SetActiveDriverInfo(driverNameStr);
+            } else {
+                settings_overlay::SetActiveDriverInfo("System Vulkan");
+            }
+        } else {
+            LOGE("adrenotools_open_libvulkan failed or returned null; will fallback to system loader");
+            settings_overlay::SetActiveDriverInfo("System Vulkan (Fallback)");
+        }
+
+        if (driverNameStr) env->ReleaseStringUTFChars(customDriverName, driverNameStr);
+        if (driverDirStr) env->ReleaseStringUTFChars(customDriverDir, driverDirStr);
+        if (hookLibDirStr) env->ReleaseStringUTFChars(nativeLibDir, hookLibDirStr);
+    }
     const char* pathStr = env->GetStringUTFChars(internalPath, nullptr);
     LOGI("Native init with data directory: %s, resMultiplier: %.2f", pathStr, resMultiplier);
     setenv("INTERNAL_STORAGE", pathStr, 1);

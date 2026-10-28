@@ -938,10 +938,15 @@ void DrawFpsOverlay() {
         if (presentTiming.sampleCount == 0) {
             ImGui::TextUnformatted("FPS: --  |  Measuring...");
         } else {
-            // Main frame rate and frame time
-            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "FPS: %.1f", presentTiming.framesPerSecond);
+            // Main frame rate and frame time (Real FPS = actual emulated frame production)
+            const float realFps = (presentTiming.effectiveFramesPerSecond > 0.1f)
+                                      ? presentTiming.effectiveFramesPerSecond
+                                      : presentTiming.framesPerSecond;
+            ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "Real FPS: %.1f", realFps);
             ImGui::SameLine();
-            ImGui::Text("(%.1fms)", presentTiming.averageFrameTimeMs);
+            ImGui::TextDisabled("(%.0f Hz | %.1fms)", presentTiming.framesPerSecond, presentTiming.averageFrameTimeMs);
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.35f, 0.85f, 1.0f, 1.0f), "| %s", GetActiveDriverInfo());
 
             // Present pacing diagnostic: reveals when guest production falls off
             // the retrace grid in either mode. "MISS" = the average frame needed
@@ -1434,5 +1439,19 @@ void SetShowFpsEnabled(bool enabled) noexcept {
 
 bool IsShowFpsEnabled() noexcept {
     return g_showFps;
+}
+
+static std::string s_activeDriverName = "System Vulkan";
+
+void SetActiveDriverInfo(const char* name) noexcept {
+    if (name && name[0] != '\0') {
+        s_activeDriverName = name;
+    } else {
+        s_activeDriverName = "System Vulkan";
+    }
+}
+
+const char* GetActiveDriverInfo() noexcept {
+    return s_activeDriverName.c_str();
 }
 } // namespace settings_overlay

@@ -19,6 +19,19 @@ import java.io.File
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val driverPickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) {
+            val result = CustomDriverManager.installDriverZip(this, uri)
+            result.onSuccess { driver ->
+                Toast.makeText(this, "Installed driver: ${driver.name}", Toast.LENGTH_SHORT).show()
+                CustomDriverManager.setActiveDriver(this, driver.id)
+                refreshDriversList()
+            }.onFailure { err ->
+                Toast.makeText(this, "Failed to install driver: ${err.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private val installLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         checkPermissionsAndData()
     }
@@ -32,9 +45,14 @@ class MainActivity : AppCompatActivity() {
         updateLogsButtonSize()
 
         setupConfigOptions()
+        refreshDriversList()
+        binding.btnInstallDriver.setOnClickListener { driverPickerLauncher.launch("application/zip") }
         checkPermissionsAndData()
 
-        if (!isGameDataInstalled()) {
+        // Auto-install prompt skipped to streamline main menu
+        // User can tap "Install Game Disc" button anytime
+
+        binding.btnInstallGameData.setOnClickListener {
             installLauncher.launch(Intent(this, InstallActivity::class.java))
         }
 
@@ -78,18 +96,174 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
+        binding.btnDeleteGameData.setOnClickListener {
+            confirmDeleteGameData()
+        }
+
         binding.btnWipeSaveData.setOnClickListener {
             wipeSaveData()
         }
 
-        setupCollapsibleSections()
+        binding.btnAdvancedSettings.setOnClickListener {
+            showAdvancedSettingsDialog()
+        }
     }
 
-    private fun setupCollapsibleSections() {
-        setupSection(binding.headerGraphics, binding.cardGraphics, binding.arrowGraphics, "section_graphics_expanded", defaultExpanded = true)
-        setupSection(binding.headerInput, binding.cardInput, binding.arrowInput, "section_input_expanded", defaultExpanded = true)
-        setupSection(binding.headerAudio, binding.cardAudio, binding.arrowAudio, "section_audio_expanded", defaultExpanded = false)
-        setupSection(binding.headerDiagnostics, binding.cardDiagnostics, binding.arrowDiagnostics, "section_diagnostics_expanded", defaultExpanded = false)
+    private fun refreshDriversList() {
+        val drivers = CustomDriverManager.listDrivers(this)
+        val activeDriver = CustomDriverManager.getActiveDriver(this)
+
+        val driverOptions = mutableListOf("System Default (Vulkan)")
+        val driverIds = mutableListOf(CustomDriverManager.DEFAULT_SYSTEM_DRIVER_ID)
+
+        drivers.forEach { d ->
+            driverOptions.add("${d.name} (${d.version})")
+            driverIds.add(d.id)
+        }
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, driverOptions)
+        binding.spinnerCustomDriver.adapter = adapter
+
+        val selectedIdx = if (activeDriver != null) {
+            val found = driverIds.indexOf(activeDriver.id)
+            if (found >= 0) found else 0
+        } else {
+            0
+        }
+
+        binding.spinnerCustomDriver.setSelection(selectedIdx)
+        binding.textCurrentDriver.text = if (activeDriver != null) {
+            "${activeDriver.name} (${activeDriver.version})"
+        } else {
+            "System Default"
+        }
+
+        binding.spinnerCustomDriver.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val chosenId = driverIds[position]
+                CustomDriverManager.setActiveDriver(this@MainActivity, chosenId)
+                val chosen = CustomDriverManager.getActiveDriver(this@MainActivity)
+                binding.textCurrentDriver.text = if (chosen != null) {
+                    "${chosen.name} (${chosen.version})"
+                } else {
+                    "System Default"
+                }
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+    }
+
+    private fun showAdvancedSettingsDialog() {
+        val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_advanced_settings, null)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .create()
+
+        val spinnerScalingFilter = dialogView.findViewById<android.widget.Spinner>(R.id.dialogSpinnerScalingFilter)
+        val layoutFsrSharpness = dialogView.findViewById<View>(R.id.dialogLayoutFsrSharpness)
+        val sliderFsrSharpness = dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.dialogSliderFsrSharpness)
+        val textFsrSharpness = dialogView.findViewById<android.widget.TextView>(R.id.dialogTextFsrSharpness)
+
+        val switchWidescreen = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchWidescreen)
+        val switchExtendToNotch = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchExtendToNotch)
+        val switchSkipUnreadyPipelines = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchSkipUnreadyPipelines)
+        val switchDisableCopyFilter = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchDisableCopyFilter)
+        val switchDisableBloom = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchDisableBloom)
+        val switchSustainedPerf = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchSustainedPerf)
+        val switchForce30Fps = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchForce30Fps)
+        val switchAudioMixer = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchAudioMixer)
+        val switchTouchControls = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchTouchControls)
+        val switchTiltControls = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchTiltControls)
+        val switchAudioMuted = dialogView.findViewById<com.google.android.material.materialswitch.MaterialSwitch>(R.id.dialogSwitchAudioMuted)
+        val btnClose = dialogView.findViewById<View>(R.id.dialogBtnClose)
+
+        val filterOptions = arrayOf(
+            "Off — Hardware / DPU Scale (Low-End)",
+            "Bilinear (Standard)",
+            "Nearest Neighbor (Integer / Sharp)",
+            "Bicubic (Catmull-Rom)",
+            "AMD FSR 1.0 (Eden / FidelityFX)"
+        )
+        val filterAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, filterOptions)
+        spinnerScalingFilter.adapter = filterAdapter
+        val savedFilterIdx = prefs.getInt("scaling_filter_idx", 0)
+        spinnerScalingFilter.setSelection(savedFilterIdx.coerceIn(0, filterOptions.size - 1))
+
+        val fsrSharpness = prefs.getInt("fsr_sharpness", 80)
+        sliderFsrSharpness.value = fsrSharpness.toFloat()
+        textFsrSharpness.text = "$fsrSharpness%"
+        layoutFsrSharpness.visibility = if (savedFilterIdx == 4) View.VISIBLE else View.GONE
+        sliderFsrSharpness.addOnChangeListener { _, value, _ ->
+            textFsrSharpness.text = "${value.toInt()}%"
+        }
+
+        switchWidescreen.isChecked = prefs.getBoolean("widescreen", true)
+        switchExtendToNotch.isChecked = prefs.getBoolean("extend_to_notch", true)
+        switchSkipUnreadyPipelines.isChecked = prefs.getBoolean("skip_unready_pipelines", true)
+        switchDisableCopyFilter.isChecked = prefs.getBoolean("disable_copy_filter", true)
+        switchDisableBloom.isChecked = prefs.getBoolean("disable_bloom", true)
+        switchSustainedPerf.isChecked = prefs.getBoolean("sustained_perf", true)
+        switchForce30Fps.isChecked = prefs.getBoolean("force_30fps", false)
+        switchAudioMixer.isChecked = prefs.getBoolean("audio_mixer", true)
+        switchTouchControls.isChecked = prefs.getBoolean("touch_controls", true)
+        switchTiltControls.isChecked = prefs.getBoolean("tilt_controls", true)
+        switchAudioMuted.isChecked = prefs.getBoolean("audio_muted", false)
+
+        fun saveAdvanced() {
+            val selectedFilter = spinnerScalingFilter.selectedItemPosition
+            prefs.edit()
+                .putInt("scaling_filter_idx", selectedFilter)
+                .putBoolean("low_end_present", selectedFilter == 0)
+                .putInt("fsr_sharpness", sliderFsrSharpness.value.toInt())
+                .putBoolean("widescreen", switchWidescreen.isChecked)
+                .putBoolean("extend_to_notch", switchExtendToNotch.isChecked)
+                .putBoolean("skip_unready_pipelines", switchSkipUnreadyPipelines.isChecked)
+                .putBoolean("disable_copy_filter", switchDisableCopyFilter.isChecked)
+                .putBoolean("disable_bloom", switchDisableBloom.isChecked)
+                .putBoolean("sustained_perf", switchSustainedPerf.isChecked)
+                .putBoolean("force_30fps", switchForce30Fps.isChecked)
+                .putBoolean("audio_mixer", switchAudioMixer.isChecked)
+                .putBoolean("touch_controls", switchTouchControls.isChecked)
+                .putBoolean("tilt_controls", switchTiltControls.isChecked)
+                .putBoolean("audio_muted", switchAudioMuted.isChecked)
+                .apply()
+            saveConfigOptions()
+        }
+
+        spinnerScalingFilter.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                layoutFsrSharpness.visibility = if (position == 4) View.VISIBLE else View.GONE
+                saveAdvanced()
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        val switchListener = android.widget.CompoundButton.OnCheckedChangeListener { _, _ -> saveAdvanced() }
+        switchWidescreen.setOnCheckedChangeListener(switchListener)
+        switchExtendToNotch.setOnCheckedChangeListener(switchListener)
+        switchSkipUnreadyPipelines.setOnCheckedChangeListener(switchListener)
+        switchDisableCopyFilter.setOnCheckedChangeListener(switchListener)
+        switchDisableBloom.setOnCheckedChangeListener(switchListener)
+        switchSustainedPerf.setOnCheckedChangeListener(switchListener)
+        switchForce30Fps.setOnCheckedChangeListener(switchListener)
+        switchAudioMixer.setOnCheckedChangeListener(switchListener)
+        switchTouchControls.setOnCheckedChangeListener(switchListener)
+        switchTiltControls.setOnCheckedChangeListener(switchListener)
+        switchAudioMuted.setOnCheckedChangeListener(switchListener)
+
+        sliderFsrSharpness.addOnSliderTouchListener(object : com.google.android.material.slider.Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {}
+            override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
+                saveAdvanced()
+            }
+        })
+
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun setupSection(
@@ -119,6 +293,73 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean(prefKey, isExpanded).apply()
             updateVisuals(animate = true)
         }
+    }
+
+    private fun confirmDeleteGameData() {
+        val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
+        val configuredRoot = prefs.getString("dvd_root", null)?.let { File(it) }
+        val sdcardData = File("/sdcard/Download/wiicompiled_data")
+        val internalData = File(filesDir, "game_data")
+
+        val targetDirs = mutableListOf<File>()
+        if (configuredRoot != null && configuredRoot.exists()) targetDirs.add(configuredRoot)
+        if (sdcardData.exists() && !targetDirs.contains(sdcardData)) targetDirs.add(sdcardData)
+        if (internalData.exists() && !targetDirs.contains(internalData)) targetDirs.add(internalData)
+
+        if (targetDirs.isEmpty()) {
+            Toast.makeText(this, "No installed game data found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val loadingDialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Calculating size...")
+            .setMessage("Scanning game files, please wait...")
+            .setCancelable(false)
+            .create()
+        loadingDialog.show()
+
+        Thread {
+            var totalBytes = 0L
+            targetDirs.forEach { totalBytes += getFolderSize(it) }
+
+            runOnUiThread {
+                loadingDialog.dismiss()
+                MaterialAlertDialogBuilder(this)
+                    .setTitle("Delete Game Data?")
+                    .setMessage("This will completely remove the extracted game files (${formatSize(totalBytes)}) from:\n\n" +
+                            targetDirs.joinToString("\n") { "• ${it.absolutePath}" } +
+                            "\n\nYou will need to install a Mario Kart Wii PAL disc again to play. Your save game (NAND) will NOT be deleted.")
+                    .setPositiveButton("Delete Everything") { _, _ ->
+                        val progressDialog = MaterialAlertDialogBuilder(this)
+                            .setTitle("Deleting Game Data...")
+                            .setMessage("Removing thousands of game files from storage...")
+                            .setCancelable(false)
+                            .create()
+                        progressDialog.show()
+
+                        Thread {
+                            var success = true
+                            targetDirs.forEach { dir ->
+                                if (dir.exists()) {
+                                    success = success && dir.deleteRecursively()
+                                }
+                            }
+                            runOnUiThread {
+                                progressDialog.dismiss()
+                                prefs.edit().remove("dvd_root").apply()
+                                checkPermissionsAndData()
+                                Toast.makeText(
+                                    this,
+                                    if (success) "Game data deleted successfully" else "Some files could not be deleted",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }.start()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }.start()
     }
 
     private fun wipeSaveData() {
@@ -285,10 +526,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchGame() {
+        val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
         saveConfigOptions()
         val intent = Intent(this, GameActivity::class.java).apply {
-            putExtra("SUSTAINED_PERF", binding.switchSustainedPerf.isChecked)
-            putExtra("EXTEND_TO_NOTCH", binding.switchExtendToNotch.isChecked)
+            putExtra("SUSTAINED_PERF", prefs.getBoolean("sustained_perf", true))
+            putExtra("EXTEND_TO_NOTCH", prefs.getBoolean("extend_to_notch", true))
         }
         startActivity(intent)
     }
@@ -296,7 +538,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupConfigOptions() {
         val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
 
-        // 1. Resolution & Upscaler
+        // 1. Resolution
         val resMultiplierValues = floatArrayOf(0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 3.0f)
         val resLabels = arrayOf(
             "0.5x (50%) [240p]",
@@ -314,87 +556,6 @@ class MainActivity : AppCompatActivity() {
             binding.textResolution.text = resLabels[idx]
         }
 
-        val filterOptions = arrayOf(
-            "Off — Hardware / DPU Scale (Low-End)",
-            "Bilinear (Standard)",
-            "Nearest Neighbor (Integer / Sharp)",
-            "Bicubic (Catmull-Rom)",
-            "AMD FSR 1.0 (Eden / FidelityFX)"
-        )
-        val filterAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, filterOptions)
-        binding.spinnerScalingFilter.adapter = filterAdapter
-        val savedFilterIdx = prefs.getInt("scaling_filter_idx", 0)
-        binding.spinnerScalingFilter.setSelection(savedFilterIdx.coerceIn(0, filterOptions.size - 1))
-
-        val fsrSharpness = prefs.getInt("fsr_sharpness", 80)
-        binding.sliderFsrSharpness.value = fsrSharpness.toFloat()
-        binding.textFsrSharpness.text = "$fsrSharpness%"
-        binding.layoutFsrSharpness.visibility = if (savedFilterIdx == 4) View.VISIBLE else View.GONE
-        binding.sliderFsrSharpness.addOnChangeListener { _, value, _ ->
-            binding.textFsrSharpness.text = "${value.toInt()}%"
-        }
-
-        // 2. Graphics toggles
-        binding.switchWidescreen.isChecked = prefs.getBoolean("widescreen", true)
-        binding.switchExtendToNotch.isChecked = prefs.getBoolean("extend_to_notch", true)
-        binding.switchSkipUnreadyPipelines.isChecked = prefs.getBoolean("skip_unready_pipelines", true)
-        binding.switchDisableCopyFilter.isChecked = prefs.getBoolean("disable_copy_filter", true)
-        binding.switchDisableBloom.isChecked = prefs.getBoolean("disable_bloom", true)
-        binding.switchSustainedPerf.isChecked = prefs.getBoolean("sustained_perf", true)
-        binding.switchForce30Fps.isChecked = prefs.getBoolean("force_30fps", false)
-        binding.switchAudioMixer.isChecked = prefs.getBoolean("audio_mixer", true)
-
-        // 3. Input controls
-        binding.switchTouchControls.isChecked = prefs.getBoolean("touch_controls", true)
-        binding.switchTiltControls.isChecked = prefs.getBoolean("tilt_controls", true)
-
-        // 4. Audio controls
-        val masterVol = prefs.getInt("audio_volume", 100)
-        binding.sliderMasterVolume.value = masterVol.toFloat()
-        binding.textMasterVolume.text = "$masterVol%"
-        binding.sliderMasterVolume.addOnChangeListener { _, value, _ ->
-            binding.textMasterVolume.text = "${value.toInt()}%"
-        }
-
-        val musicVol = prefs.getInt("audio_music_volume", 100)
-        binding.sliderMusicVolume.value = musicVol.toFloat()
-        binding.textMusicVolume.text = "$musicVol%"
-        binding.sliderMusicVolume.addOnChangeListener { _, value, _ ->
-            binding.textMusicVolume.text = "${value.toInt()}%"
-        }
-
-        val sfxVol = prefs.getInt("audio_sfx_volume", 100)
-        binding.sliderSfxVolume.value = sfxVol.toFloat()
-        binding.textSfxVolume.text = "$sfxVol%"
-        binding.sliderSfxVolume.addOnChangeListener { _, value, _ ->
-            binding.textSfxVolume.text = "${value.toInt()}%"
-        }
-
-        binding.switchAudioMuted.isChecked = prefs.getBoolean("audio_muted", false)
-
-        val autoSaveChecked = android.widget.CompoundButton.OnCheckedChangeListener { _, _ -> saveConfigOptions() }
-        binding.switchWidescreen.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchExtendToNotch.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchSkipUnreadyPipelines.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchDisableCopyFilter.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchDisableBloom.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchSustainedPerf.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchAudioMixer.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchTouchControls.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchTiltControls.setOnCheckedChangeListener(autoSaveChecked)
-        binding.switchAudioMuted.setOnCheckedChangeListener(autoSaveChecked)
-
-        val autoSaveSelected = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                if (parent == binding.spinnerScalingFilter) {
-                    binding.layoutFsrSharpness.visibility = if (position == 4) View.VISIBLE else View.GONE
-                }
-                saveConfigOptions()
-            }
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-        }
-        binding.spinnerScalingFilter.onItemSelectedListener = autoSaveSelected
-
         val autoSaveSlider = object : com.google.android.material.slider.Slider.OnSliderTouchListener {
             override fun onStartTrackingTouch(slider: com.google.android.material.slider.Slider) {}
             override fun onStopTrackingTouch(slider: com.google.android.material.slider.Slider) {
@@ -402,59 +563,37 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.sliderResolution.addOnSliderTouchListener(autoSaveSlider)
-        binding.sliderMasterVolume.addOnSliderTouchListener(autoSaveSlider)
-        binding.sliderMusicVolume.addOnSliderTouchListener(autoSaveSlider)
-        binding.sliderSfxVolume.addOnSliderTouchListener(autoSaveSlider)
-        binding.sliderFsrSharpness.addOnSliderTouchListener(autoSaveSlider)
     }
 
     private fun saveConfigOptions() {
         val prefs = getSharedPreferences("wiicompiled_settings", Context.MODE_PRIVATE)
 
         val resIdx = binding.sliderResolution.value.toInt().coerceIn(0, 5)
-        val scalingFilterIdx = binding.spinnerScalingFilter.selectedItemPosition
+        val scalingFilterIdx = prefs.getInt("scaling_filter_idx", 0)
         val lowEndPresent = scalingFilterIdx == 0
-        val fsrSharpness = binding.sliderFsrSharpness.value.toInt()
-        val widescreen = binding.switchWidescreen.isChecked
-        val extendToNotch = binding.switchExtendToNotch.isChecked
-        val skipUnreadyPipelines = binding.switchSkipUnreadyPipelines.isChecked
-        val disableCopyFilter = binding.switchDisableCopyFilter.isChecked
-        val disableBloom = binding.switchDisableBloom.isChecked
-        val sustainedPerf = binding.switchSustainedPerf.isChecked
-        val force30Fps = binding.switchForce30Fps.isChecked
-        val audioMixer = binding.switchAudioMixer.isChecked
+        val fsrSharpness = prefs.getInt("fsr_sharpness", 80)
+        val widescreen = prefs.getBoolean("widescreen", true)
+        val extendToNotch = prefs.getBoolean("extend_to_notch", true)
+        val skipUnreadyPipelines = prefs.getBoolean("skip_unready_pipelines", true)
+        val disableCopyFilter = prefs.getBoolean("disable_copy_filter", true)
+        val disableBloom = prefs.getBoolean("disable_bloom", true)
+        val sustainedPerf = prefs.getBoolean("sustained_perf", true)
+        val force30Fps = prefs.getBoolean("force_30fps", false)
+        val audioMixer = prefs.getBoolean("audio_mixer", true)
 
-        val touchControls = binding.switchTouchControls.isChecked
-        val tiltControls = binding.switchTiltControls.isChecked
+        val touchControls = prefs.getBoolean("touch_controls", true)
+        val tiltControls = prefs.getBoolean("tilt_controls", true)
 
-        val masterVol = binding.sliderMasterVolume.value.toInt()
-        val musicVol = binding.sliderMusicVolume.value.toInt()
-        val sfxVol = binding.sliderSfxVolume.value.toInt()
-        val audioMuted = binding.switchAudioMuted.isChecked
+        val masterVol = prefs.getInt("audio_volume", 100)
+        val musicVol = prefs.getInt("audio_music_volume", 100)
+        val sfxVol = prefs.getInt("audio_sfx_volume", 100)
+        val audioMuted = prefs.getBoolean("audio_muted", false)
 
-        val networkEnabled = false // Disabled until native Wiimmfi netplay is implemented (see unimplemented_features.md)
+        val networkEnabled = false
 
         prefs.edit()
-            .putString("graphics_api", "vulkan")
             .putInt("resolution_idx", resIdx)
-            .putInt("scaling_filter_idx", scalingFilterIdx)
-            .putInt("fsr_sharpness", fsrSharpness)
-            .putBoolean("widescreen", widescreen)
-            .putBoolean("extend_to_notch", extendToNotch)
-            .putBoolean("skip_unready_pipelines", skipUnreadyPipelines)
-            .putBoolean("disable_copy_filter", disableCopyFilter)
-            .putBoolean("disable_bloom", disableBloom)
-            .putBoolean("sustained_perf", sustainedPerf)
-            .putBoolean("force_30fps", force30Fps)
-            .putBoolean("audio_mixer", audioMixer)
-            .putBoolean("touch_controls", touchControls)
-            .putBoolean("tilt_controls", tiltControls)
-            .putInt("audio_volume", masterVol)
-            .putInt("audio_music_volume", musicVol)
-            .putInt("audio_sfx_volume", sfxVol)
-            .putBoolean("audio_muted", audioMuted)
-            .putBoolean("network_enabled", networkEnabled)
-            .putBoolean("low_end_present", lowEndPresent)
+            .putBoolean("low_end_present", scalingFilterIdx == 0)
             .apply()
 
         val multiplier = when (resIdx) {

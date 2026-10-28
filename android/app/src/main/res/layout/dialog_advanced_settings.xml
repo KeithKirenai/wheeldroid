@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/md_theme_dark_surfaceContainer"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Advanced Settings"
+            android:textColor="@color/md_theme_dark_onSurface"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Upscaling Filter -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Upscaling Filter"
+            android:textColor="@color/md_theme_dark_onSurface"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/dialogSpinnerScalingFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp"
+            android:backgroundTint="@color/md_theme_dark_primary" />
+
+        <!-- FSR Sharpness Slider -->
+        <LinearLayout
+            android:id="@+id/dialogLayoutFsrSharpness"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="FSR Sharpness"
+                    android:textColor="@color/md_theme_dark_onSurface"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/dialogTextFsrSharpness"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="80%"
+                    android:textColor="@color/md_theme_dark_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/dialogSliderFsrSharpness"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:valueFrom="0.0"
+                android:valueTo="100.0"
+                android:stepSize="5.0"
+                android:value="80.0"
+                app:thumbColor="@color/md_theme_dark_primary"
+                app:trackColorActive="@color/md_theme_dark_primary" />
+        </LinearLayout>
+
+        <!-- Widescreen Switch -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Widescreen (16:9)"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchWidescreen"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Extend to Notch -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Extend into Display Cutout / Notch"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchExtendToNotch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Skip Unready Pipelines -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Asynchronous Pipeline Compilation"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchSkipUnreadyPipelines"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Disable Copy Filter -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Disable EFB Copy Deflicker Filter"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchDisableCopyFilter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Disable Bloom -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Disable Bloom (Boost FPS)"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchDisableBloom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Sustained Performance -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Thermal Throttling Protection"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchSustainedPerf"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Force 30 FPS -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Force 30 FPS Lock"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchForce30Fps"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+        </LinearLayout>
+
+        <!-- Audio Mixer Thread -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Asynchronous Audio Mixer"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchAudioMixer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Touch Controls Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="On-screen Touch Controls"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchTouchControls"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Tilt Steering Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Tilt Accelerometer Steering"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchTiltControls"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Mute Audio Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Mute Audio"
+                android:textColor="@color/md_theme_dark_onSurface"
+                android:textSize="14sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/dialogSwitchAudioMuted"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="false" />
+        </LinearLayout>
+
+        <!-- Close Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dialogBtnClose"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Done"
+            app:cornerRadius="14dp" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

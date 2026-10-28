@@ -90,7 +90,7 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
         }
     }
 
-    private external fun nativeInit(internalPath: String, resMultiplier: Float)
+    private external fun nativeInit(internalPath: String, resMultiplier: Float, nativeLibDir: String?, customDriverDir: String?, customDriverName: String?)
     private external fun nativeSurfaceCreated(surface: Any)
     private external fun nativeSurfaceDestroyed()
     private external fun nativeOnAppPause()
@@ -386,7 +386,11 @@ class GameActivity : AppCompatActivity(), SurfaceHolder.Callback, SensorEventLis
             return
         }
 
-        nativeInit(filesDir.absolutePath, activeResMultiplier)
+        val customDriver = CustomDriverManager.getActiveDriver(this)
+        val nativeLibDir = applicationInfo.nativeLibraryDir
+        val driverDir = customDriver?.rootDir?.absolutePath?.let { if (it.endsWith('/')) it else "$it/" }
+        val driverName = customDriver?.libraryName
+        nativeInit(filesDir.absolutePath, activeResMultiplier, nativeLibDir, driverDir, driverName)
     }
 
     private val defaultControlParams = mutableMapOf<View, FrameLayout.LayoutParams>()

@@ -1,157 +1,235 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/md_theme_dark_background"
-    android:fillViewport="true"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <!-- Top App Bar -->
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="24dp">
+        android:background="@color/md_theme_dark_background"
+        app:elevation="0dp">
 
-        <!-- Top Header Title with Status Badge on Upper Right -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
+            android:paddingHorizontal="20dp">
 
             <ImageView
-                android:layout_width="58dp"
-                android:layout_height="42dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@drawable/ic_wheeldroid_header"
                 android:scaleType="fitCenter"
-                android:contentDescription="WheelDroid App Icon"
-                android:layout_marginEnd="12dp" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="WheelDroid"
-                    android:textColor="@color/md_theme_dark_onBackground"
-                    android:textSize="22sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="-0.02" />
-            </LinearLayout>
-
-            <!-- Upper Right Ready / No Data Status Indicator -->
-            <LinearLayout
-                android:id="@+id/headerStatusBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginStart="8dp">
-
-                <ImageView
-                    android:id="@+id/headerStatusIcon"
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:src="@drawable/ic_check_circle"
-                    android:contentDescription="Data Status Icon"
-                    android:layout_marginEnd="5dp" />
-
-                <TextView
-                    android:id="@+id/headerStatusText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Ready"
-                    android:textColor="@color/status_ready"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- Primary Action: Launch Game -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/launchBtn"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:layout_marginBottom="14dp"
-            android:text="Launch Game"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:icon="@drawable/ic_play_arrow"
-            app:iconGravity="textStart"
-            app:iconPadding="10dp"
-            app:iconSize="22dp"
-            app:iconTint="@color/md_theme_dark_onPrimary"
-            app:cornerRadius="18dp"
-            android:enabled="false"
-            app:backgroundTint="@color/md_theme_dark_primary"
-            android:textColor="@color/md_theme_dark_onPrimary" />
-
-        <!-- Category: Display & Performance (Collapsible) -->
-        <LinearLayout
-            android:id="@+id/headerGraphics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="8dp">
+                android:contentDescription="WheelDroid Logo" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="GRAPHICS &amp; ENGINE"
-                android:textColor="@color/md_theme_dark_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08" />
+                android:layout_marginStart="12dp"
+                android:text="WheelDroid"
+                android:textColor="@color/md_theme_dark_onBackground"
+                android:textSize="20sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="-0.01" />
 
-            <ImageView
-                android:id="@+id/arrowGraphics"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_expand_more"
-                android:contentDescription="Expand or Collapse Graphics"
-                app:tint="@color/md_theme_dark_primary" />
+            <!-- Quick Advanced Settings Gear -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdvancedSettings"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                app:icon="@drawable/ic_settings"
+                app:iconSize="22dp"
+                app:iconTint="@color/md_theme_dark_onSurfaceVariant" />
         </LinearLayout>
+    </com.google.android.material.appbar.AppBarLayout>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardGraphics"
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
-            app:cardCornerRadius="18dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/md_theme_dark_outlineVariant">
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="32dp">
 
-            <LinearLayout
-                android:id="@+id/contentGraphics"
+            <!-- GAME HERO CARD (Dolphin / Console style) -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="10dp">
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="3dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/md_theme_dark_outlineVariant">
 
-                <!-- Internal Resolution Selection Slider -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:paddingVertical="8dp">
+                    android:padding="20dp">
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <!-- Game Icon / Cover Artwork -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="@color/md_theme_dark_surfaceContainerHighest">
+
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/ic_wheeldroid_header"
+                                android:scaleType="centerInside"
+                                android:padding="10dp"
+                                android:contentDescription="Game Cover" />
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Mario Kart Wii"
+                                android:textColor="@color/md_theme_dark_onSurface"
+                                android:textSize="20sp"
+                                android:fontFamily="sans-serif-medium"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Static Recompilation • PAL (RMCP01)"
+                                android:textColor="@color/md_theme_dark_onSurfaceVariant"
+                                android:textSize="12sp"
+                                android:layout_marginTop="2dp" />
+
+                            <!-- Status Badge -->
+                            <LinearLayout
+                                android:id="@+id/headerStatusBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:background="@drawable/bg_key_badge"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="3dp"
+                                android:layout_marginTop="6dp">
+
+                                <ImageView
+                                    android:id="@+id/headerStatusIcon"
+                                    android:layout_width="12dp"
+                                    android:layout_height="12dp"
+                                    android:src="@drawable/ic_check_circle"
+                                    android:contentDescription="Status Icon"
+                                    android:layout_marginEnd="4dp" />
+
+                                <TextView
+                                    android:id="@+id/headerStatusText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Ready to Play"
+                                    android:textColor="@color/status_ready"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/md_theme_dark_outlineVariant"
+                        android:layout_marginVertical="16dp" />
+
+                    <!-- Primary Action Buttons -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/launchBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="54dp"
+                        android:text="Launch Game"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:icon="@drawable/ic_play_arrow"
+                        app:iconGravity="textStart"
+                        app:iconPadding="10dp"
+                        app:iconSize="22dp"
+                        app:iconTint="@color/md_theme_dark_onPrimary"
+                        app:cornerRadius="16dp"
+                        android:enabled="false"
+                        app:backgroundTint="@color/md_theme_dark_primary"
+                        android:textColor="@color/md_theme_dark_onPrimary" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnInstallGameData"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="8dp"
+                        android:text="Install / Change Disc (.iso / .wbfs)"
+                        android:textSize="14sp"
+                        app:icon="@drawable/ic_disc"
+                        app:iconGravity="textStart"
+                        app:iconPadding="10dp"
+                        app:iconSize="18dp"
+                        app:cornerRadius="14dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- SECTION: GRAPHICS & PERFORMANCE -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GRAPHICS &amp; PERFORMANCE"
+                android:textColor="@color/md_theme_dark_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/md_theme_dark_outlineVariant">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- Resolution Scale Slider -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -178,7 +256,7 @@
                             android:id="@+id/textResolution"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="1.0x (100%) [480p]"
+                            android:text="1.0x (100%)"
                             android:textColor="@color/md_theme_dark_primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -194,1048 +272,205 @@
                         android:value="2.0"
                         app:thumbColor="@color/md_theme_dark_primary"
                         app:trackColorActive="@color/md_theme_dark_primary" />
-                </LinearLayout>
 
-                <!-- Upscaling Filter Selection -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/md_theme_dark_outlineVariant"
+                        android:layout_marginVertical="8dp" />
 
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_resolution_accent"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Upscaler Icon" />
-
+                    <!-- Custom GPU Driver -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Upscaling Filter"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_cpu_perf"
+                            android:layout_marginEnd="10dp"
+                            android:contentDescription="GPU Driver Icon" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:text="Off = low-end SurfaceFlinger scaling, no shader upscaler"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Vulkan Driver"
+                                android:textColor="@color/md_theme_dark_onSurface"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/textCurrentDriver"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="System Default"
+                                android:textColor="@color/md_theme_dark_onSurfaceVariant"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnInstallDriver"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="Install ZIP"
                             android:textSize="12sp" />
                     </LinearLayout>
 
                     <Spinner
-                        android:id="@+id/spinnerScalingFilter"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/spinnerCustomDriver"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:backgroundTint="@color/md_theme_dark_primary" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <!-- FSR Sharpness Slider (visible when FSR selected) -->
-                <LinearLayout
-                    android:id="@+id/layoutFsrSharpness"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingVertical="6dp"
-                    android:visibility="gone">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="FSR Sharpness"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:id="@+id/textFsrSharpness"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="80%"
-                            android:textColor="@color/md_theme_dark_primary"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderFsrSharpness"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:valueFrom="0.0"
-                        android:valueTo="100.0"
-                        android:stepSize="5.0"
-                        android:value="80.0"
-                        app:thumbColor="@color/md_theme_dark_primary"
-                        app:trackColorActive="@color/md_theme_dark_primary" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- 2-Column Row: Widescreen & Extend Cutout -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="8dp">
-
-                    <!-- Col 1: Widescreen -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingEnd="6dp">
-
-                        <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:src="@drawable/ic_aspect_ratio_accent"
-                            android:layout_marginEnd="8dp"
-                            android:contentDescription="Widescreen Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Widescreen"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="14sp" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchWidescreen"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:scaleX="1.0"
-                            android:scaleY="1.0"
-                            app:thumbTint="@color/switch_cyan_thumb"
-                            app:trackTint="@color/switch_cyan_track"
-                            android:checked="true" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="24dp"
-                        android:background="@color/md_theme_dark_outlineVariant" />
-
-                    <!-- Col 2: Extend Cutout -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="6dp">
-
-                        <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:src="@drawable/ic_fullscreen_accent"
-                            android:layout_marginEnd="8dp"
-                            android:contentDescription="Extend Cutout Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Extend Cutout"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="14sp" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchExtendToNotch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:scaleX="1.0"
-                            android:scaleY="1.0"
-                            app:thumbTint="@color/switch_green_thumb"
-                            app:trackTint="@color/switch_green_track"
-                            android:checked="true" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- Skip Unready Pipelines Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_bolt_accent"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Skip Pipelines Icon" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Skip Unready Pipelines"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Eliminates shader compilation stutter"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchSkipUnreadyPipelines"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_yellow_thumb"
-                        app:trackTint="@color/switch_yellow_track"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- Disable Copy Filter Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_filter_accent"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Disable Copy Filter Icon" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Disable Copy Filter"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sharpens frame buffer clarity"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchDisableCopyFilter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_blue_thumb"
-                        app:trackTint="@color/switch_blue_track"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- Disable Bloom Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_bloom_accent"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Disable Bloom Icon" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Disable Bloom (Faster)"
-                        android:textColor="@color/md_theme_dark_onSurface"
-                        android:textSize="15sp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchDisableBloom"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_rose_thumb"
-                        app:trackTint="@color/switch_rose_track"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- Sustained Performance Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_cpu_perf"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Sustained Performance Icon" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sustained Performance"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Mitigates thermal throttling spikes"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchSustainedPerf"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_orange_thumb"
-                        app:trackTint="@color/switch_orange_track"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- 30 FPS Mode Switch (Low-End Devices) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_speedometer"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="30 FPS Mode Icon" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="30 FPS Mode (Low-End Devices)"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Uses game's split-screen physics; cuts GPU/battery load"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchForce30Fps"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_teal_thumb"
-                        app:trackTint="@color/switch_teal_track"
-                        android:checked="false" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <!-- Async Audio Mixing Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_audio_mixer_accent"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Async Audio Mixing Icon" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Async Audio Mixing"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Offloads sound mixer to worker core"
-                            android:textColor="@color/md_theme_dark_onSurfaceVariant"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchAudioMixer"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_blue_thumb"
-                        app:trackTint="@color/switch_blue_track"
-                        android:checked="true" />
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Category: Input Controls (Collapsible) -->
-        <LinearLayout
-            android:id="@+id/headerInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="8dp">
-
+            <!-- SECTION: CONTROLS -->
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="INPUT &amp; CONTROLS"
+                android:text="CONTROLS &amp; INPUT"
                 android:textColor="@color/md_theme_dark_primary"
-                android:textSize="14sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.08" />
+                android:letterSpacing="0.08"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="8dp" />
 
-            <ImageView
-                android:id="@+id/arrowInput"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_expand_more"
-                android:contentDescription="Expand or Collapse Input Controls"
-                app:tint="@color/md_theme_dark_primary" />
-        </LinearLayout>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/md_theme_dark_outlineVariant">
-
-            <LinearLayout
-                android:id="@+id/contentInput"
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="10dp">
+                android:layout_marginBottom="20dp"
+                app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/md_theme_dark_outlineVariant">
 
-                <!-- 2-Column Row: Touch & Tilt Controls -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="8dp">
-
-                    <!-- Col 1: Touch Overlay -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingEnd="6dp">
-
-                        <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:src="@drawable/ic_touch_accent"
-                            android:layout_marginEnd="8dp"
-                            android:contentDescription="Touch Overlay Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Touch Overlay"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="14sp" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchTouchControls"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:scaleX="1.0"
-                            android:scaleY="1.0"
-                            app:thumbTint="@color/switch_teal_thumb"
-                            app:trackTint="@color/switch_teal_track"
-                            android:checked="true" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="24dp"
-                        android:background="@color/md_theme_dark_outlineVariant" />
-
-                    <!-- Col 2: Tilt Steering -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingStart="6dp">
-
-                        <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:src="@drawable/ic_steering_accent"
-                            android:layout_marginEnd="8dp"
-                            android:contentDescription="Tilt Steering Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Tilt Steering"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="14sp" />
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/switchTiltControls"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:scaleX="1.0"
-                            android:scaleY="1.0"
-                            app:thumbTint="@color/switch_purple_thumb"
-                            app:trackTint="@color/switch_purple_track"
-                            android:checked="true" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="2dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEditTouchLayout"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="6dp"
-                    android:text="Edit On-Screen Layout"
-                    android:textSize="14sp"
-                    app:icon="@drawable/ic_touch_accent"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconSize="18dp"
-                    app:iconTint="@color/md_theme_dark_primary"
-                    app:cornerRadius="14dp"
-                    app:strokeColor="@color/md_theme_dark_primary"
-                    android:textColor="@color/md_theme_dark_primary" />
-
-                <!-- Controller Remap Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRemapper"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="2dp"
-                    android:text="Gamepad &amp; Button Mapping"
-                    android:textSize="14sp"
-                    app:icon="@drawable/ic_controller"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconSize="18dp"
-                    app:iconTint="@color/switch_purple_thumb"
-                    app:cornerRadius="14dp"
-                    app:strokeColor="@color/switch_purple_thumb"
-                    android:textColor="@color/switch_purple_thumb" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        
-        <!-- Category: Audio Volume & Controls (Collapsible) -->
-        <LinearLayout
-            android:id="@+id/headerAudio"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="8dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="AUDIO SETTINGS"
-                android:textColor="@color/md_theme_dark_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08" />
-
-            <ImageView
-                android:id="@+id/arrowAudio"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_expand_more"
-                android:contentDescription="Expand or Collapse Audio Settings"
-                app:tint="@color/md_theme_dark_primary" />
-        </LinearLayout>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardAudio"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/md_theme_dark_outlineVariant">
-
-            <LinearLayout
-                android:id="@+id/contentAudio"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="10dp">
-
-                <!-- Master Volume Slider -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingVertical="10dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_volume_master"
-                            android:layout_marginEnd="10dp"
-                            android:contentDescription="Master Volume Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Master Volume"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/textMasterVolume"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="100%"
-                            android:textColor="@color/slider_master_accent"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderMasterVolume"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:valueFrom="0"
-                        android:valueTo="100"
-                        android:stepSize="5"
-                        android:value="100"
-                        app:thumbColor="@color/slider_master_accent"
-                        app:trackColorActive="@color/slider_master_accent"
-                        app:trackColorInactive="@color/md_theme_dark_surfaceContainerHighest" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="1dp" />
-
-                <!-- Music Volume Slider -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingVertical="10dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_music_note"
-                            android:layout_marginEnd="10dp"
-                            android:contentDescription="Music Volume Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Music Volume"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/textMusicVolume"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="100%"
-                            android:textColor="@color/slider_music_accent"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderMusicVolume"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:valueFrom="0"
-                        android:valueTo="100"
-                        android:stepSize="5"
-                        android:value="100"
-                        app:thumbColor="@color/slider_music_accent"
-                        app:trackColorActive="@color/slider_music_accent"
-                        app:trackColorInactive="@color/md_theme_dark_surfaceContainerHighest" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="1dp" />
-
-                <!-- Sound Effects Volume Slider -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingVertical="10dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_game_sfx"
-                            android:layout_marginEnd="10dp"
-                            android:contentDescription="Sound Effects Volume Icon" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Sound Effects Volume"
-                            android:textColor="@color/md_theme_dark_onSurface"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/textSfxVolume"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="100%"
-                            android:textColor="@color/slider_sfx_accent"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <com.google.android.material.slider.Slider
-                        android:id="@+id/sliderSfxVolume"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:valueFrom="0"
-                        android:valueTo="100"
-                        android:stepSize="5"
-                        android:value="100"
-                        app:thumbColor="@color/slider_sfx_accent"
-                        app:trackColorActive="@color/slider_sfx_accent"
-                        app:trackColorInactive="@color/md_theme_dark_surfaceContainerHighest" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/md_theme_dark_outlineVariant"
-                    android:layout_marginVertical="1dp" />
-
-                <!-- Mute Audio Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="10dp">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_volume_mute"
-                        android:layout_marginEnd="10dp"
-                        android:contentDescription="Mute Audio Icon" />
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Mute All Audio"
-                        android:textColor="@color/md_theme_dark_onSurface"
-                        android:textSize="15sp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchAudioMuted"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:thumbTint="@color/switch_red_thumb"
-                        app:trackTint="@color/switch_red_track"
-                        android:checked="false" />
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Category: Diagnostics & Data Management (Collapsible) -->
-        <LinearLayout
-            android:id="@+id/headerDiagnostics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?attr/selectableItemBackground"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="8dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="DATA &amp; DIAGNOSTICS"
-                android:textColor="@color/md_theme_dark_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08" />
-
-            <ImageView
-                android:id="@+id/arrowDiagnostics"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_expand_more"
-                android:contentDescription="Expand or Collapse Diagnostics"
-                app:tint="@color/md_theme_dark_primary" />
-        </LinearLayout>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardDiagnostics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="@color/md_theme_dark_outlineVariant">
-
-            <LinearLayout
-                android:id="@+id/contentDiagnostics"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="8dp">
-
-                <!-- Side-by-side Clear Logs and Export Logs Buttons -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="6dp">
+                    android:padding="12dp">
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearLogs"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:id="@+id/btnEditTouchLayout"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:minHeight="44dp"
+                        android:layout_height="48dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="4dp"
-                        android:paddingHorizontal="6dp"
-                        android:paddingVertical="4dp"
-                        android:text="Clear Logs"
+                        android:layout_marginEnd="6dp"
+                        android:text="Edit Touch Layout"
                         android:textSize="13sp"
+                        app:icon="@drawable/ic_touch_accent"
+                        app:iconSize="18dp"
+                        app:cornerRadius="14dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRemapper"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:text="Controller Remap"
+                        android:textSize="13sp"
+                        app:icon="@drawable/ic_controller"
+                        app:iconSize="18dp"
+                        app:cornerRadius="14dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- SECTION: MAINTENANCE & DIAGNOSTICS -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DIAGNOSTICS &amp; DATA"
+                android:textColor="@color/md_theme_dark_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/md_theme_dark_surfaceContainer"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="1dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/md_theme_dark_outlineVariant">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/exportLogsBtn"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:text="Share Logs"
+                            android:textSize="13sp"
+                            app:icon="@drawable/ic_share"
+                            app:iconSize="16dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnClearLogs"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:text="Clear Logs"
+                            android:textColor="@color/status_warning"
+                            android:textSize="13sp"
+                            app:icon="@drawable/ic_delete_sweep"
+                            app:iconTint="@color/status_warning"
+                            app:iconSize="16dp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDeleteGameData"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:text="Uninstall Game Data (Disc Files)"
+                        android:textColor="@color/status_warning"
                         app:icon="@drawable/ic_delete_sweep"
-                        app:iconGravity="textStart"
-                        app:iconPadding="4dp"
-                        app:iconSize="18dp"
-                        app:iconTint="#EF5350"
-                        app:cornerRadius="14dp"
-                        app:strokeColor="#EF5350"
-                        app:strokeWidth="1dp"
-                        android:textColor="#EF5350" />
+                        app:iconTint="@color/status_warning"
+                        app:iconSize="14dp"
+                        android:textSize="12sp" />
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/exportLogsBtn"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:minHeight="44dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="4dp"
-                        android:paddingHorizontal="6dp"
-                        android:paddingVertical="4dp"
-                        android:text="Export Logs"
-                        android:textSize="13sp"
-                        app:icon="@drawable/ic_share"
-                        app:iconGravity="textStart"
-                        app:iconPadding="4dp"
-                        app:iconSize="18dp"
-                        app:iconTint="#FFA726"
-                        app:cornerRadius="14dp"
-                        app:strokeColor="#FFA726"
-                        app:strokeWidth="1dp"
-                        android:textColor="#FFA726" />
+                        android:id="@+id/btnWipeSaveData"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:text="Reset Save Data (NAND)"
+                        android:textColor="@color/md_theme_dark_outline"
+                        android:textSize="12sp" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <!-- Wipe Save Data Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWipeSaveData"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:text="Wipe Save Data (Fresh Run)"
-                    android:textSize="14sp"
-                    app:icon="@drawable/ic_power_settings"
-                    app:iconGravity="textStart"
-                    app:iconPadding="6dp"
-                    app:iconSize="18dp"
-                    app:iconTint="#AB47BC"
-                    android:textColor="#AB47BC"
-                    app:strokeColor="#AB47BC"
-                    app:strokeWidth="1dp"
-                    app:cornerRadius="14dp" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

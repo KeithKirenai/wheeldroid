@@ -16,4 +16,6 @@ void RecordFrameStart() noexcept;
 void RecordFrameEnd() noexcept;
 void SetShowFpsEnabled(bool enabled) noexcept;
 bool IsShowFpsEnabled() noexcept;
+void SetActiveDriverInfo(const char* name) noexcept;
+const char* GetActiveDriverInfo() noexcept;
 } // namespace settings_overlay
