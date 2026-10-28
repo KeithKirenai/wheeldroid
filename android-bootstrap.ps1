@@ -325,6 +325,8 @@ function Install-PortableCmake() {
 function Find-CMake {
     param([string]$Sdk)
     $candidates = @()
+    $portable = Join-Path $Root "deps\cmake\bin\cmake.exe"
+    if (Test-Path $portable) { $candidates += $portable }
     if ($Sdk) {
         $cmakeRoot = Join-Path $Sdk "cmake"
         if (Test-Path $cmakeRoot) {
@@ -333,9 +335,23 @@ function Find-CMake {
                 ForEach-Object { Join-Path $_.FullName "bin\cmake.exe" }
         }
     }
-    foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
     $fromPath = (Get-Command cmake.exe -ErrorAction SilentlyContinue)
-    if ($fromPath) { return $fromPath.Source }
+    if ($fromPath) { $candidates += $fromPath.Source }
+
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path $c)) {
+            try {
+                $verOut = & $c --version 2>$null | Select-Object -First 1
+                if ($verOut -match "version (\d+)\.(\d+)") {
+                    $major = [int]$matches[1]
+                    $minor = [int]$matches[2]
+                    if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 25)) {
+                        return $c
+                    }
+                }
+            } catch {}
+        }
+    }
     return $null
 }
 
@@ -407,17 +423,65 @@ function Find-Adb {
 function Has-DotNet8 {
     try {
         $sdks = & dotnet --list-sdks 2>$null
-        return @($sdks -match "^8\.\d+\.\d+").Count -gt 0
+        if (@($sdks -match "^8\.\d+\.\d+").Count -gt 0) { return $true }
+        $portableDotNet = Join-Path $Root "deps\dotnet\dotnet.exe"
+        if (Test-Path $portableDotNet) {
+            $env:DOTNET_ROOT = Join-Path $Root "deps\dotnet"
+            $env:PATH = "$($env:DOTNET_ROOT);$env:PATH"
+            return $true
+        }
+        return $false
     } catch { return $false }
+}
+
+function Install-PortableDotNet {
+    $destDir = Join-Path $Root "deps\dotnet"
+    $dotnetExe = Join-Path $destDir "dotnet.exe"
+    if (Test-Path $dotnetExe) {
+        $env:DOTNET_ROOT = $destDir
+        $env:PATH = "$destDir;$env:PATH"
+        return $dotnetExe
+    }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    $installScript = Join-Path $downloadDir "dotnet-install.ps1"
+    Write-Host ""
+    Write-Host "[Agnostic Auto-Download] .NET 8 SDK not detected on system." -ForegroundColor Cyan
+    Write-Host "Downloading Microsoft .NET 8 installer script..." -ForegroundColor Yellow
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $installScript -UseBasicParsing
+    Write-Host "Installing portable .NET 8 SDK into $destDir (no admin required)..." -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installScript -Channel 8.0 -InstallDir $destDir -NoPath
+    $env:DOTNET_ROOT = $destDir
+    $env:PATH = "$destDir;$env:PATH"
+    Write-Host "Portable .NET 8 SDK ready at: $destDir" -ForegroundColor Green
+    return $dotnetExe
+}
+
+function Get-NodTool {
+    $destDir = Join-Path $Root "deps\tools"
+    $nodExe = Join-Path $destDir "nodtool.exe"
+    if (Test-Path $nodExe) { return $nodExe }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    New-Item -ItemType Directory -Force $destDir | Out-Null
+    $nodUrl = "https://github.com/encounter/nod/releases/download/v2.0.0-alpha.12/nodtool-windows-x86_64.exe"
+    Write-Host "[Agnostic Auto-Download] Downloading official nodtool (RVZ/Wii disc decompressor)..." -ForegroundColor Cyan
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $nodUrl -OutFile $nodExe -UseBasicParsing
+    return $nodExe
 }
 
 function Write-LocalProperties {
     $content = @()
     $content += "sdk.dir=$($script:SdkRootDetected -replace '\\', '/')"
+    if ($script:NdkDetected) {
+        $content += "ndk.dir=$($script:NdkDetected -replace '\\', '/')"
+    }
     # cmake.dir is only meaningful for a real CMake install; the SDK-managed
     # cmake (pinned via `version = "4.1.2"` in build.gradle.kts) is resolved by
     # Gradle itself, so PATH shims are intentionally omitted.
-    if ($script:CmakeDetected -match "Sdk(\\|/)cmake") {
+    if ($script:CmakeDetected) {
         $cmakeDir = Split-Path (Split-Path $script:CmakeDetected -Parent) -Parent
         $content += "cmake.dir=$($cmakeDir -replace '\\', '/')"
     }
@@ -476,43 +540,67 @@ function Resolve-DiscSource {
 }
 
 function Extract-DiscImage([string]$ImagePath) {
-    if (-not (Has-DotNet8)) {
-        Fail "Extracting from a disc image requires the .NET 8 SDK (to build WiiDiscExtractor). " +
-             "Install from https://dotnet.microsoft.com/download/dotnet/8.0"
-    }
-
-    Write-Host "Building WiiDiscExtractor..." -ForegroundColor Yellow
-    Push-Location $Root
-    try {
-        & dotnet build $ExtractorCsproj -c Release --nologo -v q
-        if ($LASTEXITCODE -ne 0) { Fail "WiiDiscExtractor build failed (dotnet build exit code $LASTEXITCODE)." }
-    } finally { Pop-Location }
-
-    if (-not (Test-Path $ExtractorExe)) {
-        Fail "WiiDiscExtractor.exe not found after build at $ExtractorExe"
-    }
-
-    # Output folder: a staging dir named <imagename>_extracted next to the image,
-    # inside which main.dol + StaticR.rel sit side-by-side (the --staging mode).
+    $ext = [System.IO.Path]::GetExtension($ImagePath).ToLowerInvariant()
     $imageName = [System.IO.Path]::GetFileNameWithoutExtension($ImagePath)
     $imageDir = [System.IO.Path]::GetDirectoryName($ImagePath)
     $stagingDir = Join-Path $imageDir "${imageName}_extracted"
 
-    Write-Host "Extracting from $ImagePath -> $stagingDir" -ForegroundColor Cyan
-    Push-Location $Root
-    try {
-        $proc = Start-Process -FilePath $ExtractorExe -ArgumentList @(
-            "-i", $ImagePath,
-            "-a", $stagingDir,
-            "--staging",
-            "--cancel-after", "0"
-        ) -NoNewWindow -Wait -PassThru
+    $dolStaged = Join-Path $stagingDir "main.dol"
+    $relStaged = Join-Path $stagingDir "StaticR.rel"
+    if ((Test-Path $dolStaged) -and (Test-Path $relStaged)) {
+        Write-Host "Reusing previously extracted game files at: $stagingDir" -ForegroundColor Green
+        return $stagingDir
+    }
 
+    Write-Host "Extracting from $ImagePath -> $stagingDir" -ForegroundColor Cyan
+
+    if ($ext -eq ".rvz" -or $ext -eq ".wia" -or $ext -eq ".chd" -or $ext -eq ".gcz") {
+        $nod = Get-NodTool
+        New-Item -ItemType Directory -Force $stagingDir | Out-Null
+        $proc = Start-Process -FilePath $nod -ArgumentList @("extract", "`"$ImagePath`"", "`"$stagingDir`"") -NoNewWindow -Wait -PassThru
         if ($proc.ExitCode -ne 0) {
-            # The CLI prints its own ERROR line; surface both.
-            Fail "WiiDiscExtractor failed (exit $($proc.ExitCode)). Check its output above."
+            Fail "nodtool extraction failed with exit code $($proc.ExitCode)"
         }
-    } finally { Pop-Location }
+        $destDol = Join-Path $stagingDir "main.dol"
+        $destRel = Join-Path $stagingDir "StaticR.rel"
+        $dolCandidate = Get-ChildItem -Path $stagingDir -Recurse -Filter "main.dol" -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName -ne $stagingDir } | Select-Object -First 1
+        $relCandidate = Get-ChildItem -Path $stagingDir -Recurse -Filter "StaticR.rel" -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName -ne $stagingDir } | Select-Object -First 1
+        if ($dolCandidate -and ($dolCandidate.FullName -ne $destDol)) {
+            Copy-Item -Path $dolCandidate.FullName -Destination $destDol -Force
+        }
+        if ($relCandidate -and ($relCandidate.FullName -ne $destRel)) {
+            Copy-Item -Path $relCandidate.FullName -Destination $destRel -Force
+        }
+    } else {
+        if (-not (Has-DotNet8)) { Install-PortableDotNet }
+        if (-not (Has-DotNet8)) {
+            Fail "Extracting from a disc image requires the .NET 8 SDK (to build WiiDiscExtractor)."
+        }
+        Write-Host "Building WiiDiscExtractor..." -ForegroundColor Yellow
+        Push-Location $Root
+        try {
+            & dotnet build $ExtractorCsproj -c Release --nologo -v q
+            if ($LASTEXITCODE -ne 0) { Fail "WiiDiscExtractor build failed (dotnet build exit code $LASTEXITCODE)." }
+        } finally { Pop-Location }
+
+        if (-not (Test-Path $ExtractorExe)) {
+            Fail "WiiDiscExtractor.exe not found after build at $ExtractorExe"
+        }
+
+        Push-Location $Root
+        try {
+            $proc = Start-Process -FilePath $ExtractorExe -ArgumentList @(
+                "-i", "`"$ImagePath`"",
+                "-a", "`"$stagingDir`"",
+                "--staging",
+                "--cancel-after", "0"
+            ) -NoNewWindow -Wait -PassThru
+
+            if ($proc.ExitCode -ne 0) {
+                Fail "WiiDiscExtractor failed (exit $($proc.ExitCode)). Check its output above."
+            }
+        } finally { Pop-Location }
+    }
 
     # Verify the staging dir actually contains the two files.
     foreach ($f in $GameFiles) {
@@ -673,7 +761,7 @@ if ($Only -eq "" -or $Only -eq "Assets") {
     }
 }
 
-if ($Only -eq "" -or $Only -eq "DiscExtract") {
+if ($Only -eq "DiscExtract") {
     Write-Step "Extracting disc image (WiiDiscExtractor)"
     if (-not $DiscSource) {
         Fail "DiscExtract requires -DiscSource <image>. Pass a Wii ISO/WBFS path."
@@ -686,8 +774,6 @@ if ($Only -eq "" -or $Only -eq "DiscExtract") {
         Write-Host "DiscSource is already an extracted directory; nothing to extract." -ForegroundColor DarkYellow
         Write-Host "main.dol and StaticR.rel are present at $DiscSource" -ForegroundColor Green
     }
-    # If Kind == "image", Extract-DiscImage already ran inside Resolve-DiscSource and
-    # printed its own progress. Nothing further to do here.
 }
 
 if ($Only -eq "" -or $Only -eq "Translate") {

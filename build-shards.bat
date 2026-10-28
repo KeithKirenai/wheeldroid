@@ -17,19 +17,21 @@ rem ---------------------------------------------------------------
 rem Resolve Android SDK root: env vars, then local.properties sdk.dir,
 rem then well-known install locations.
 rem ---------------------------------------------------------------
-set "SDK_ROOT=%ANDROID_HOME%"
-if not defined SDK_ROOT set "SDK_ROOT=%ANDROID_SDK_ROOT%"
-if defined SDK_ROOT set "SDK_ROOT=%SDK_ROOT:\=/%"
-
 set "LP_SDK_DIR="
 set "LP_NDK_DIR="
+set "LP_CMAKE_DIR="
 if exist "%LOCAL_PROPS%" (
     for /f "usebackq tokens=1,* delims==" %%A in ("%LOCAL_PROPS%") do (
         if /i "%%A"=="sdk.dir" set "LP_SDK_DIR=%%B"
         if /i "%%A"=="ndk.dir" set "LP_NDK_DIR=%%B"
+        if /i "%%A"=="cmake.dir" set "LP_CMAKE_DIR=%%B"
     )
 )
-if not defined SDK_ROOT set "SDK_ROOT=%LP_SDK_DIR:\=/%"
+
+set "SDK_ROOT="
+if defined LP_SDK_DIR if exist "%LP_SDK_DIR:\=/%" set "SDK_ROOT=%LP_SDK_DIR:\=/%"
+if not defined SDK_ROOT if defined ANDROID_HOME if exist "%ANDROID_HOME%" set "SDK_ROOT=%ANDROID_HOME:\=/%"
+if not defined SDK_ROOT if defined ANDROID_SDK_ROOT if exist "%ANDROID_SDK_ROOT%" set "SDK_ROOT=%ANDROID_SDK_ROOT:\=/%"
 if not defined SDK_ROOT if exist "%LOCALAPPDATA%\Android\Sdk" set "SDK_ROOT=%LOCALAPPDATA%\Android\Sdk"
 if not defined SDK_ROOT if exist "%USERPROFILE%\AppData\Local\Android\Sdk" set "SDK_ROOT=%USERPROFILE%\AppData\Local\Android\Sdk"
 if not defined SDK_ROOT set "SDK_ROOT=C:\Android\Sdk"
@@ -38,13 +40,14 @@ rem ---------------------------------------------------------------
 rem Resolve Android NDK: env override, local.properties ndk.dir, then
 rem pick the newest installed under the SDK.
 rem ---------------------------------------------------------------
+set "SDK_ROOT_BS=%SDK_ROOT:/=\%"
 set "ANDROID_NDK="
 if defined ANDROID_NDK_HOME set "ANDROID_NDK=%ANDROID_NDK_HOME%"
 if defined ANDROID_NDK set "ANDROID_NDK=%ANDROID_NDK:\=/%"
-if not defined ANDROID_NDK if defined LP_NDK_DIR set "ANDROID_NDK=%LP_NDK_DIR:\=/%"
-if not defined ANDROID_NDK if exist "%SDK_ROOT%\ndk" (
-    for /f "delims=" %%V in ('dir /b /ad /o-n "%SDK_ROOT%\ndk" 2^>nul') do (
-        if not defined ANDROID_NDK set "ANDROID_NDK=%SDK_ROOT%\ndk\%%V"
+if not defined ANDROID_NDK if defined LP_NDK_DIR set "ANDROID_NDK=%LP_NDK_DIR%"
+if not defined ANDROID_NDK if exist "%SDK_ROOT_BS%\ndk" (
+    for /f "delims=" %%V in ('dir /b /ad /o-n "%SDK_ROOT_BS%\ndk" 2^>nul') do (
+        if not defined ANDROID_NDK set "ANDROID_NDK=%SDK_ROOT_BS%\ndk\%%V"
     )
 )
 
@@ -58,24 +61,30 @@ if not exist "%ANDROID_NDK%" (
 )
 
 rem ---------------------------------------------------------------
-rem Resolve CMake: env override from bootstrap, SDK-managed cmake, then PATH.
+rem Resolve CMake: env override, local.properties cmake.dir, portable deps, SDK, then PATH.
 rem ---------------------------------------------------------------
 set "CMAKE_BIN="
 if defined CMAKE_BIN_SET set "CMAKE_BIN=%CMAKE_BIN%"
-if not defined CMAKE_BIN if exist "%SDK_ROOT%\cmake\4.1.2\bin\cmake.exe" set "CMAKE_BIN=%SDK_ROOT%\cmake\4.1.2\bin\cmake.exe"
-if not defined CMAKE_BIN for /f "delims=" %%C in ('dir /b /ad /o-n "%SDK_ROOT%\cmake" 2^>nul') do (
-    if not defined CMAKE_BIN if exist "%SDK_ROOT%\cmake\%%C\bin\cmake.exe" set "CMAKE_BIN=%SDK_ROOT%\cmake\%%C\bin\cmake.exe"
+if not defined CMAKE_BIN if defined LP_CMAKE_DIR if exist "%LP_CMAKE_DIR%\bin\cmake.exe" set "CMAKE_BIN=%LP_CMAKE_DIR%\bin\cmake.exe"
+if not defined CMAKE_BIN if exist "%ROOT_DIR%\deps\cmake\bin\cmake.exe" set "CMAKE_BIN=%ROOT_DIR%\deps\cmake\bin\cmake.exe"
+if not defined CMAKE_BIN if exist "%SDK_ROOT_BS%\cmake\4.1.2\bin\cmake.exe" set "CMAKE_BIN=%SDK_ROOT_BS%\cmake\4.1.2\bin\cmake.exe"
+if not defined CMAKE_BIN for /f "delims=" %%C in ('dir /b /ad /o-n "%SDK_ROOT_BS%\cmake" 2^>nul') do (
+    if not defined CMAKE_BIN if exist "%SDK_ROOT_BS%\cmake\%%C\bin\cmake.exe" set "CMAKE_BIN=%SDK_ROOT_BS%\cmake\%%C\bin\cmake.exe"
 )
-if not defined CMAKE_BIN set "CMAKE_BIN=cmake.exe"
+where cmake.exe >nul 2>&1
+if not defined CMAKE_BIN if %errorlevel% equ 0 set "CMAKE_BIN=cmake.exe"
 
 rem ---------------------------------------------------------------
-rem Resolve Ninja: SDK-managed copy (prefer newest cmake dir), then PATH.
+rem Resolve Ninja: env override, local.properties cmake.dir, portable deps, SDK, then PATH.
 rem ---------------------------------------------------------------
 set "NINJA_BIN="
-if not defined NINJA_BIN for /f "delims=" %%C in ('dir /b /ad /o-n "%SDK_ROOT%\cmake" 2^>nul') do (
-    if not defined NINJA_BIN if exist "%SDK_ROOT%\cmake\%%C\bin\ninja.exe" set "NINJA_BIN=%SDK_ROOT%\cmake\%%C\bin\ninja.exe"
+if defined LP_CMAKE_DIR if exist "%LP_CMAKE_DIR%\bin\ninja.exe" set "NINJA_BIN=%LP_CMAKE_DIR%\bin\ninja.exe"
+if not defined NINJA_BIN if exist "%ROOT_DIR%\deps\ninja\ninja.exe" set "NINJA_BIN=%ROOT_DIR%\deps\ninja\ninja.exe"
+if not defined NINJA_BIN for /f "delims=" %%C in ('dir /b /ad /o-n "%SDK_ROOT_BS%\cmake" 2^>nul') do (
+    if not defined NINJA_BIN if exist "%SDK_ROOT_BS%\cmake\%%C\bin\ninja.exe" set "NINJA_BIN=%SDK_ROOT_BS%\cmake\%%C\bin\ninja.exe"
 )
-if not defined NINJA_BIN set "NINJA_BIN=ninja.exe"
+where ninja.exe >nul 2>&1
+if not defined NINJA_BIN if %errorlevel% equ 0 set "NINJA_BIN=ninja.exe"
 
 echo [INFO] Android SDK   : %SDK_ROOT%
 echo [INFO] Android NDK   : %ANDROID_NDK%

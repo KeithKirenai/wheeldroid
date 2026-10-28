@@ -1,3 +1,5 @@
+import java.util.Properties
+import java.io.FileInputStream
 import java.io.IOException
 
 plugins {
@@ -25,7 +27,45 @@ val ccacheArgs = if (toolOnPath("ccache")) {
 android {
     namespace = "com.wiicompiled.mkw"
     compileSdk = 35
-    ndkVersion = "28.2.13676358"
+    // Read local.properties ndk.dir or fallback gracefully
+    val localPropsFile = rootProject.file("local.properties")
+    val localProps = Properties()
+    if (localPropsFile.exists()) {
+        localProps.load(localPropsFile.inputStream())
+    }
+    val propNdkDir = localProps.getProperty("ndk.dir")
+    if (!propNdkDir.isNullOrBlank()) {
+        val ndkFolder = file(propNdkDir)
+        if (ndkFolder.exists()) {
+            // ndkPath omitted to allow ndk.dir in local.properties
+            val sourceProps = File(ndkFolder, "source.properties")
+            if (sourceProps.exists()) {
+                val sp = Properties()
+                sp.load(sourceProps.inputStream())
+                val rev = sp.getProperty("Pkg.Revision")
+                if (!rev.isNullOrBlank()) {
+                    ndkVersion = rev
+                }
+            }
+        }
+    }
+    // Read local.properties cmake.dir if present
+    val propCmakeDir = localProps.getProperty("cmake.dir")
+    val cmakeVer = if (!propCmakeDir.isNullOrBlank()) {
+        val cmakeFolder = file(propCmakeDir)
+        val binCmake = File(cmakeFolder, "bin/cmake.exe")
+        if (binCmake.exists()) {
+            val p = ProcessBuilder(binCmake.absolutePath, "--version").start()
+            val out = p.inputStream.bufferedReader().readLine() ?: ""
+            val parts = out.split(" ")
+            val ver = parts.find { it.count { c -> c == '.' } >= 2 } ?: "3.28.6"
+            ver
+        } else {
+            cmakeFolder.name
+        }
+    } else {
+        "3.28.6"
+    }
 
     defaultConfig {
         applicationId = "com.wiicompiled.mkw"
@@ -89,7 +129,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "4.1.2"
+            version = cmakeVer
         }
     }
 
