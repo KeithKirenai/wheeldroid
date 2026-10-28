@@ -27,10 +27,14 @@ object WiiDiscExtractor {
 
     // Mario Kart Wii PAL expected constants
     const val EXPECTED_GAME_ID = "RMCP01"
+    val SUPPORTED_GAME_IDS = setOf("RMCP01", "RMCE01", "RMCJ01")
     const val WII_MAGIC = 0x5D1C9EA3L
+    // PAL (RMCP01)
     const val EXPECTED_DOL_SHA256 = "80d18895b39c63bd80f457398bfcbb91b7d16ac116a41a88967e954080155b05"
     const val EXPECTED_REL_SHA256 = "16d9d146112541fefea701ecb5bc1a496f9d50e4a752fbb5b6778e7c6399f67d"
-
+    // NTSC-U (RMCE01)
+    const val EXPECTED_DOL_SHA256_NTSC_U = "d2beec1b1645fcd134efe9e7e63774b546667764ed8d431029daccd725995694"
+    const val EXPECTED_REL_SHA256_NTSC_U = "1168107f8fdef27a356df76036db55afe4fbf7752606dbac991726701133a617"
     // Nintendo Wii Retail Common Key
     private val RETAIL_COMMON_KEY = byteArrayOf(
         0xeb.toByte(), 0xe4.toByte(), 0x2a.toByte(), 0x22.toByte(),
@@ -205,12 +209,10 @@ object WiiDiscExtractor {
             )
         }
 
-        if (gameId != EXPECTED_GAME_ID) {
+        if (gameId !in SUPPORTED_GAME_IDS) {
             val errorMsg = when (gameId) {
-                "RMCE01" -> "Detected USA version (RMCE01). This recompiled port requires the PAL European version (RMCP01)."
-                "RMCJ01" -> "Detected Japanese version (RMCJ01). This recompiled port requires the PAL European version (RMCP01)."
-                "RMCK01" -> "Detected Korean version (RMCK01). This recompiled port requires the PAL European version (RMCP01)."
-                else -> "Unsupported game ID: '$gameId'. Expected Mario Kart Wii PAL ('$EXPECTED_GAME_ID')."
+                "RMCK01" -> "Detected Korean version (RMCK01). Supported versions are PAL (RMCP01), USA (RMCE01), and Japan (RMCJ01)."
+                else -> "Unsupported game ID: '$gameId'. Expected Mario Kart Wii PAL (RMCP01), USA (RMCE01), or Japan (RMCJ01)."
             }
             return ExtractionResult(success = false, errorMessage = errorMsg, gameId = gameId)
         }
