@@ -946,7 +946,7 @@ bool present_presentation_job(const PresentationJob& job) {
             .colorAttachments = attachments.data(),
         };
         const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
-        pass.SetPipeline(webgpu::g_CopyPipeline);
+        pass.SetPipeline(webgpu::active_copy_pipeline());
         pass.SetBindGroup(0, job.image->bindGroup, 0, nullptr);
         pass.SetViewport(0.f, 0.f,
                          static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.width),
