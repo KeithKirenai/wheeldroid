@@ -175,6 +175,39 @@ function Fail($Message, [int]$Code = 1) {
     exit $Code
 }
 
+function Install-PortableSdk() {
+    $cmdtoolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+    $destSdk = Join-Path $Root "deps\AndroidSdk"
+    if (Test-Path (Join-Path $destSdk "platform-tools\adb.exe")) {
+        return $destSdk
+    }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    $zipPath = Join-Path $downloadDir "cmdline-tools.zip"
+    Write-Host ""
+    Write-Host "[Agnostic Auto-Download] Android SDK not detected on system." -ForegroundColor Cyan
+    Write-Host "Downloading Android Command-Line Tools from official Google repository (~150 MB)..." -ForegroundColor Yellow
+    if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 100000000) {
+        Invoke-WebRequest -Uri $cmdtoolsUrl -OutFile $zipPath -UseBasicParsing
+    }
+    Write-Host "Extracting Command-Line Tools into $destSdk ..." -ForegroundColor Cyan
+    $extractTemp = Join-Path $downloadDir "cmdline_temp"
+    if (Test-Path $extractTemp) { Remove-Item $extractTemp -Recurse -Force }
+    New-Item -ItemType Directory -Force $extractTemp | Out-Null
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractTemp -Force
+    $cmdDir = Join-Path $destSdk "cmdline-tools\latest"
+    New-Item -ItemType Directory -Force $cmdDir | Out-Null
+    Move-Item -Path (Join-Path $extractTemp "cmdline-tools\*") -Destination $cmdDir -Force
+    Remove-Item $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Installing platform-tools and build-tools via sdkmanager..." -ForegroundColor Cyan
+    $sdkmanager = Join-Path $cmdDir "bin\sdkmanager.bat"
+    if (Test-Path $sdkmanager) {
+        & cmd /c "echo y | `"$sdkmanager`" --sdk_root=`"$destSdk`" `"platform-tools`" `"platforms;android-34`""
+    }
+    Write-Host "Android SDK successfully set up at: $destSdk" -ForegroundColor Green
+    return $destSdk
+}
+
 function Find-AndroidSdk {
     $candidates = @($SdkRoot.trim(), $env:ANDROID_HOME, $env:ANDROID_SDK_ROOT,
         (Join-Path $env:LOCALAPPDATA "Android\Sdk"),
@@ -189,6 +222,37 @@ function Find-AndroidSdk {
         }
     }
     return $null
+}
+
+function Install-PortableNdk([string]$TargetSdkDir) {
+    $ndkVersion = "28.0.12433566"
+    $zipName = "android-ndk-r28-windows.zip"
+    $ndkUrl = "https://dl.google.com/android/repository/$zipName"
+    $destDir = if ($TargetSdkDir) { Join-Path $TargetSdkDir "ndk\$ndkVersion" } else { Join-Path $Root "deps\ndk\$ndkVersion" }
+    if (Test-Path (Join-Path $destDir "toolchains\llvm\prebuilt\windows-x86_64\bin")) {
+        return $destDir
+    }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    $zipPath = Join-Path $downloadDir $zipName
+    Write-Host ""
+    Write-Host "[Agnostic Auto-Download] Android NDK 28 not detected locally." -ForegroundColor Cyan
+    Write-Host "Downloading Android NDK r28 from official Google repository (~715 MB)..." -ForegroundColor Yellow
+    Write-Host "URL: $ndkUrl" -ForegroundColor DarkGray
+    if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 700000000) {
+        Invoke-WebRequest -Uri $ndkUrl -OutFile $zipPath -UseBasicParsing
+    }
+    Write-Host "Extracting Android NDK r28 into $destDir ..." -ForegroundColor Cyan
+    $extractTemp = Join-Path $downloadDir "ndk_temp"
+    if (Test-Path $extractTemp) { Remove-Item $extractTemp -Recurse -Force }
+    New-Item -ItemType Directory -Force $extractTemp | Out-Null
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractTemp -Force
+    $extractedFolder = Get-ChildItem $extractTemp -Directory | Select-Object -First 1
+    New-Item -ItemType Directory -Force (Split-Path -Parent $destDir) | Out-Null
+    Move-Item -Path $extractedFolder.FullName -Destination $destDir -Force
+    Remove-Item $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Android NDK 28 successfully installed at: $destDir" -ForegroundColor Green
+    return $destDir
 }
 
 function Find-Ndk {
@@ -485,12 +549,18 @@ if ($Only -eq "" -or $Only -eq "Detect") {
     }
     if (Has-DotNet8) { Write-Host ".NET 8:      OK" -ForegroundColor Green }
     else { Write-Host ".NET 8:      not found (needed only to re-run the translator)" -ForegroundColor DarkYellow }
-
     if (-not $script:SdkRootDetected) {
-        Fail "Android SDK not found. Set ANDROID_HOME, install to C:\Android\Sdk, or pass -SdkRoot."
+        $script:SdkRootDetected = Install-PortableSdk
+        if (-not $script:SdkRootDetected -or -not (Test-Path $script:SdkRootDetected)) {
+            Fail "Failed to automatically install Android SDK."
+        }
     }
+
     if (-not $script:NdkDetected) {
-        Fail "Android NDK 28 not found under the SDK. Install via Studio SDK Manager or sdkmanager."
+        $script:NdkDetected = Install-PortableNdk -TargetSdkDir $script:SdkRootDetected
+        if (-not $script:NdkDetected -or -not (Test-Path $script:NdkDetected)) {
+            Fail "Failed to automatically install Android NDK 28."
+        }
     }
 }
 
