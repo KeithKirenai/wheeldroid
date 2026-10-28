@@ -100,7 +100,7 @@ function Invoke-ExtractorCli([string]$ImagePath, [string]$OutputDir, [switch]$St
     } finally { Pop-Location }
 
     if (-not (Test-Path $ExtractorExe)) {
-        Fail "WiiDiscExtractor.exe not found after build."
+        Fail "WiiDiscExtractor.exe not found after build at $ExtractorExe"
     }
 
     $args = @()
