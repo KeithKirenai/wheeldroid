@@ -219,6 +219,7 @@ Not code, but the documentation this project depends on:
   upscaler shaders (Bicubic Catmull-Rom filtering and AMD FidelityFX Super Resolution 1.0 EASU/RCAS
   pipeline) adapted for Aurora WebGPU.
 - **AMD FidelityFX Super Resolution (FSR 1.0)** - MIT License, Copyright (c) 2021 Advanced Micro Devices, Inc.
+- **SSBU-Recomp & WindowSmash** - GPL-3.0 License. Portable embedded Python bootstrapper (`scripts/bootstrap.ps1`), background asset discovery, and reactive GUI wizard pattern adapted from `SSBU-Recomp` by Denkishi (<https://github.com/Denkishi/ssbu-recomp>) and WindowSmash by SNO2207.
 
 ---
 

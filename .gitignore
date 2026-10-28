@@ -23,6 +23,7 @@
 Code.pul
 
 # Build output
+/deps/
 /build/
 /build-*/
 /native-build/
