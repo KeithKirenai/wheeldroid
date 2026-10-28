@@ -240,7 +240,15 @@ function Install-PortableNdk([string]$TargetSdkDir) {
     Write-Host "Downloading Android NDK r28 from official Google repository (~715 MB)..." -ForegroundColor Yellow
     Write-Host "URL: $ndkUrl" -ForegroundColor DarkGray
     if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 700000000) {
-        Invoke-WebRequest -Uri $ndkUrl -OutFile $zipPath -UseBasicParsing
+        try {
+            # Use .NET WebClient with custom progress for fast, reliable, unbuffered downloads
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($ndkUrl, $zipPath)
+            $wc.Dispose()
+        } catch {
+            # Fallback to Invoke-WebRequest
+            Invoke-WebRequest -Uri $ndkUrl -OutFile $zipPath -UseBasicParsing
+        }
     }
     Write-Host "Extracting Android NDK r28 into $destDir ..." -ForegroundColor Cyan
     $extractTemp = Join-Path $downloadDir "ndk_temp"
@@ -254,7 +262,6 @@ function Install-PortableNdk([string]$TargetSdkDir) {
     Write-Host "Android NDK 28 successfully installed at: $destDir" -ForegroundColor Green
     return $destDir
 }
-
 function Find-Ndk {
     param([string]$Sdk)
     if ($NdkRoot.trim()) {
@@ -278,6 +285,43 @@ function Find-Ndk {
     return $null
 }
 
+function Install-PortableCmake() {
+    $cmakeVersion = "3.28.6"
+    $zipName = "cmake-$cmakeVersion-windows-x86_64.zip"
+    $cmakeUrl = "https://github.com/Kitware/CMake/releases/download/v$cmakeVersion/$zipName"
+    $destDir = Join-Path $Root "deps\cmake"
+    $cmakeExe = Join-Path $destDir "bin\cmake.exe"
+    if (Test-Path $cmakeExe) {
+        return $cmakeExe
+    }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    $zipPath = Join-Path $downloadDir $zipName
+    Write-Host ""
+    Write-Host "[Agnostic Auto-Download] CMake not detected locally." -ForegroundColor Cyan
+    Write-Host "Downloading portable CMake $cmakeVersion (~45 MB)..." -ForegroundColor Yellow
+    if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 40000000) {
+        try {
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($cmakeUrl, $zipPath)
+            $wc.Dispose()
+        } catch {
+            Invoke-WebRequest -Uri $cmakeUrl -OutFile $zipPath -UseBasicParsing
+        }
+    }
+    Write-Host "Extracting CMake into $destDir ..." -ForegroundColor Cyan
+    $extractTemp = Join-Path $downloadDir "cmake_temp"
+    if (Test-Path $extractTemp) { Remove-Item $extractTemp -Recurse -Force }
+    New-Item -ItemType Directory -Force $extractTemp | Out-Null
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $extractTemp -Force
+    $extractedFolder = Get-ChildItem $extractTemp -Directory | Select-Object -First 1
+    New-Item -ItemType Directory -Force $destDir | Out-Null
+    Move-Item -Path (Join-Path $extractedFolder.FullName "*") -Destination $destDir -Force
+    Remove-Item $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Portable CMake successfully installed at: $cmakeExe" -ForegroundColor Green
+    return $cmakeExe
+}
+
 function Find-CMake {
     param([string]$Sdk)
     $candidates = @()
@@ -293,6 +337,37 @@ function Find-CMake {
     $fromPath = (Get-Command cmake.exe -ErrorAction SilentlyContinue)
     if ($fromPath) { return $fromPath.Source }
     return $null
+}
+
+function Install-PortableNinja() {
+    $ninjaVersion = "1.12.1"
+    $zipName = "ninja-win.zip"
+    $ninjaUrl = "https://github.com/ninja-build/ninja/releases/download/v$ninjaVersion/$zipName"
+    $destDir = Join-Path $Root "deps\ninja"
+    $ninjaExe = Join-Path $destDir "ninja.exe"
+    if (Test-Path $ninjaExe) {
+        return $ninjaExe
+    }
+    $downloadDir = Join-Path $Root "build\downloads"
+    New-Item -ItemType Directory -Force $downloadDir | Out-Null
+    $zipPath = Join-Path $downloadDir $zipName
+    Write-Host ""
+    Write-Host "[Agnostic Auto-Download] Ninja not detected locally." -ForegroundColor Cyan
+    Write-Host "Downloading portable Ninja $ninjaVersion (~600 KB)..." -ForegroundColor Yellow
+    if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 500000) {
+        try {
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($ninjaUrl, $zipPath)
+            $wc.Dispose()
+        } catch {
+            Invoke-WebRequest -Uri $ninjaUrl -OutFile $zipPath -UseBasicParsing
+        }
+    }
+    Write-Host "Extracting Ninja into $destDir ..." -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force $destDir | Out-Null
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $destDir -Force
+    Write-Host "Portable Ninja successfully installed at: $ninjaExe" -ForegroundColor Green
+    return $ninjaExe
 }
 
 function Find-Ninja {
@@ -561,6 +636,12 @@ if ($Only -eq "" -or $Only -eq "Detect") {
         if (-not $script:NdkDetected -or -not (Test-Path $script:NdkDetected)) {
             Fail "Failed to automatically install Android NDK 28."
         }
+    }
+    if (-not $script:CmakeDetected) {
+        $script:CmakeDetected = Install-PortableCmake
+    }
+    if (-not $script:NinjaDetected) {
+        $script:NinjaDetected = Install-PortableNinja
     }
 }
 
